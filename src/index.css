@@ -1085,6 +1085,28 @@ input:focus, textarea:focus, select:focus {
   color: var(--warning);
 }
 
+.tutorial-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  transition: all var(--transition-fast);
+  text-decoration: none;
+}
+.tutorial-link-btn:hover {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #ef4444;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.35);
+  transform: translateY(-1px);
+}
+
 /* ═══════════════════════════════════════════════════════════════
    PATTERN DETAIL
    ═══════════════════════════════════════════════════════════════ */

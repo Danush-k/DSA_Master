@@ -7,6 +7,19 @@ import {
   Search, Moon, Sun, ChevronRight, Check, ExternalLink, StickyNote,
   Menu, X, Filter, Clock, Flame, Calendar, ChevronDown, ChevronUp, BarChart3, Info
 } from 'lucide-react';
+
+// Custom Youtube SVG Icon since brand icons are not exported in this lucide-react version
+const Youtube = ({ size = 24, fill = "currentColor", ...props }) => (
+  <svg
+    viewBox="0 0 24 24"
+    width={size}
+    height={size}
+    fill={fill}
+    {...props}
+  >
+    <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.518 3.545 12 3.545 12 3.545s-7.518 0-9.388.508a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11c1.87.508 9.388.508 9.388.508s7.518 0 9.388-.508a3.003 3.003 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+  </svg>
+);
 import questions from './data/questions.js';
 import topics from './data/topics.js';
 import patterns from './data/patterns.js';
@@ -38,6 +51,58 @@ function useAllQuestions() {
   return useMemo(() => {
     return [...staticQuestions, ...customQuestions];
   }, [customQuestions]);
+}
+
+// Direct YouTube explanation mappings for top/important problems
+const POPULAR_VIDEO_MAP = {
+  1: "https://www.youtube.com/watch?v=UXDSeD9mN-k", // Two Sum
+  9: "https://www.youtube.com/watch?v=excAOvwF_Wk", // Best Time to Buy and Sell Stock
+  19: "https://www.youtube.com/watch?v=DhFh8Kw7ymk", // 3Sum
+  20: "https://www.youtube.com/watch?v=w7ftYGh0u5Y", // Container With Most Water
+  24: "https://www.youtube.com/watch?v=2JzRBPFYbKE", // Merge Intervals
+  27: "https://www.youtube.com/watch?v=oO5uLE7EUlM", // Longest Consecutive Sequence
+  34: "https://www.youtube.com/watch?v=m18Hntz4go8", // Trapping Rain Water
+  35: "https://www.youtube.com/watch?v=tcvY8tScPDU", // Sliding Window Maximum
+  64: "https://www.youtube.com/watch?v=XXyfz1y6A-U", // Valid Palindrome
+  67: "https://www.youtube.com/watch?v=wkDfsKpUsUA", // Valid Parentheses
+  70: "https://www.youtube.com/watch?v=vzdNOK2oB2E", // Group Anagrams
+  71: "https://www.youtube.com/watch?v=qtVh-XEpsJo", // Longest Substring Without Repeating Characters
+  83: "https://www.youtube.com/watch?v=xDEuM5qa0sg", // LRU Cache
+  91: "https://www.youtube.com/watch?v=QX45ClJpGfA", // Binary Search
+  93: "https://www.youtube.com/watch?v=5qGrJbHhqFs", // Search in Rotated Sorted Array
+  103: "https://www.youtube.com/watch?v=iT1Y20fOPn0", // Reverse Linked List
+  105: "https://www.youtube.com/watch?v=gBTe7lFR3vc", // Linked List Cycle
+  152: "https://www.youtube.com/watch?v=f-sj7I5oXEI", // Validate Binary Search Tree
+  156: "https://www.youtube.com/watch?v=358b1fJ768g", // Lowest Common Ancestor of a Binary Tree
+};
+
+// Direct YouTube tutorial mappings for core DSA patterns
+const PATTERN_VIDEO_MAP = {
+  "sliding-window": "https://www.youtube.com/watch?v=9Kd9oG6P-r0",
+  "two-pointers": "https://www.youtube.com/watch?v=2wB11y5811g",
+  "binary-search": "https://www.youtube.com/watch?v=QX45ClJpGfA",
+  "dfs": "https://www.youtube.com/watch?v=pcKY4hjDrxk",
+  "bfs": "https://www.youtube.com/watch?v=pcKY4hjDrxk",
+  "dynamic-programming": "https://www.youtube.com/watch?v=tyB0ySGQ3v4",
+  "backtracking": "https://www.youtube.com/watch?v=DKCbsiDBN6c",
+  "union-find": "https://www.youtube.com/watch?v=aBxjDBCClM8",
+  "topological-sort": "https://www.youtube.com/watch?v=5_Elua5DWpY",
+  "shortest-path": "https://www.youtube.com/watch?v=V6H1qAeB-N4",
+  "trie": "https://www.youtube.com/watch?v=dBGUm8l1g18",
+  "bit-manipulation": "https://www.youtube.com/watch?v=5yu8G6-1Fz0",
+};
+
+// Helper to resolve problem explanation video
+function getProblemVideoUrl(q) {
+  if (q.videoUrl) return q.videoUrl; // Custom problem video link
+  if (POPULAR_VIDEO_MAP[q.id]) return POPULAR_VIDEO_MAP[q.id];
+  return `https://www.youtube.com/results?search_query=striver+${encodeURIComponent(q.title)}+dsa`;
+}
+
+// Helper to resolve pattern explanation video
+function getPatternVideoUrl(pid, patName) {
+  if (PATTERN_VIDEO_MAP[pid]) return PATTERN_VIDEO_MAP[pid];
+  return `https://www.youtube.com/results?search_query=striver+${encodeURIComponent(patName || pid)}+dsa`;
 }
 
 function Sidebar({ isOpen, onClose }) {
@@ -378,6 +443,18 @@ function QuestionRow({ q, showTopic = false, showPattern = true }) {
           </div>
         </td>
         <td>
+          <a
+            href={getProblemVideoUrl(q)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="tutorial-link-btn"
+            title="Watch YouTube Tutorial"
+          >
+            <Youtube size={14} />
+            <span>Video</span>
+          </a>
+        </td>
+        <td>
           <span className={`badge badge-${q.difficulty.toLowerCase()}`}>{q.difficulty}</span>
         </td>
         {showTopic && (
@@ -483,6 +560,7 @@ function QuestionTable({ questionList, showTopic = false, showPattern = true }) 
             <th onClick={() => toggleSort('title')} className={sortBy === 'title' ? 'sorted' : ''}>
               Title {sortBy === 'title' && (sortDir === 'asc' ? '↑' : '↓')}
             </th>
+            <th style={{ width: 90 }}>Tutorial</th>
             <th style={{ width: 90 }} onClick={() => toggleSort('difficulty')} className={sortBy === 'difficulty' ? 'sorted' : ''}>
               Difficulty {sortBy === 'difficulty' && (sortDir === 'asc' ? '↑' : '↓')}
             </th>
@@ -1251,22 +1329,36 @@ function PatternDetailPage() {
           <h2 className="pattern-hero-title">{pat.name}</h2>
           <p className="pattern-hero-description">{pat.description}</p>
 
-          {pat.timeComplexity && (
-            <div className="pattern-meta">
+          <div className="pattern-meta">
+            {pat.timeComplexity && (
               <div className="pattern-meta-item">
                 <span className="pattern-meta-label">Time Complexity</span>
                 <span className="pattern-meta-value" style={{ fontFamily: 'var(--font-mono)' }}>{pat.timeComplexity}</span>
               </div>
+            )}
+            {pat.spaceComplexity && (
               <div className="pattern-meta-item">
                 <span className="pattern-meta-label">Space Complexity</span>
                 <span className="pattern-meta-value" style={{ fontFamily: 'var(--font-mono)' }}>{pat.spaceComplexity}</span>
               </div>
-              <div className="pattern-meta-item">
-                <span className="pattern-meta-label">Problems</span>
-                <span className="pattern-meta-value">{patQs.length} questions</span>
-              </div>
+            )}
+            <div className="pattern-meta-item">
+              <span className="pattern-meta-label">Problems</span>
+              <span className="pattern-meta-value">{patQs.length} questions</span>
             </div>
-          )}
+            <div className="pattern-meta-item">
+              <span className="pattern-meta-label">Concept Video</span>
+              <a
+                href={getPatternVideoUrl(patternId, pat.name)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="tutorial-link-btn"
+                style={{ width: 'fit-content', marginTop: 4 }}
+              >
+                <Youtube size={14} /> Watch Tutorial
+              </a>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1405,9 +1497,18 @@ function RevisionPage() {
                 <div className="card revision-card" key={rev.questionId}>
                   <div className="revision-card-header">
                     <div>
-                      <div className="revision-card-title">
-                        <a href={q.url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>
-                          {q.num}. {q.title} <ExternalLink size={12} style={{ opacity: 0.4 }} />
+                      <div className="revision-card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <a href={q.url} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', display: 'inline-flex', alignItems: 'center' }}>
+                          {q.num}. {q.title} <ExternalLink size={12} style={{ marginLeft: 4, opacity: 0.4 }} />
+                        </a>
+                        <a
+                          href={getProblemVideoUrl(q)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Watch Tutorial"
+                          style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center' }}
+                        >
+                          <Youtube size={14} />
                         </a>
                       </div>
                       <div className="revision-card-meta">
@@ -1463,9 +1564,20 @@ function RevisionPage() {
                     <tr key={rev.questionId}>
                       <td><span className="question-number">{q.num}</span></td>
                       <td>
-                        <a href={q.url} target="_blank" rel="noopener noreferrer" className="question-title-link">
-                          {q.title}
-                        </a>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <a href={q.url} target="_blank" rel="noopener noreferrer" className="question-title-link">
+                            {q.title}
+                          </a>
+                          <a
+                            href={getProblemVideoUrl(q)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Watch Tutorial"
+                            style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center' }}
+                          >
+                            <Youtube size={14} />
+                          </a>
+                        </div>
                       </td>
                       <td><span className={`badge badge-${q.difficulty.toLowerCase()}`}>{q.difficulty}</span></td>
                       <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{rev.nextRevisionDate}</td>
@@ -1730,6 +1842,7 @@ function AddCustomQuestionModal({ onClose }) {
   const [form, setForm] = useState({
     title: '',
     url: '',
+    videoUrl: '',
     difficulty: 'Easy',
     topic: 'arrays',
     pattern: 'basic-traversal',
@@ -1761,6 +1874,7 @@ function AddCustomQuestionModal({ onClose }) {
     addCustomQuestion({
       title: form.title.trim(),
       url: finalUrl,
+      videoUrl: form.videoUrl.trim() || undefined,
       difficulty: form.difficulty,
       topic: form.topic,
       pattern: form.pattern,
@@ -1810,6 +1924,21 @@ function AddCustomQuestionModal({ onClose }) {
                 placeholder="e.g., https://leetcode.com/problems/two-sum/"
                 value={form.url}
                 onChange={e => setForm({ ...form, url: e.target.value })}
+                style={{
+                  width: '100%', padding: '8px 12px', background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)',
+                  color: 'var(--text-primary)', fontSize: 14,
+                }}
+              />
+            </div>
+
+            <div className="notes-field">
+              <label>YouTube Video URL (Optional)</label>
+              <input
+                type="url"
+                placeholder="e.g., https://www.youtube.com/watch?v=..."
+                value={form.videoUrl}
+                onChange={e => setForm({ ...form, videoUrl: e.target.value })}
                 style={{
                   width: '100%', padding: '8px 12px', background: 'var(--bg-tertiary)',
                   border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)',
