@@ -18,7 +18,7 @@ let authUser = null;
 // Initialize synchronization listeners
 export function initDbSync(onStatusChange) {
   if (!auth || !db) {
-    if (onStatusChange) onStatusChange('local-only');
+    if (onStatusChange) onStatusChange('local-only', null);
     return;
   }
 
@@ -26,12 +26,12 @@ export function initDbSync(onStatusChange) {
   onAuthStateChanged(auth, async (user) => {
     if (user) {
       authUser = user;
-      if (onStatusChange) onStatusChange('syncing');
+      if (onStatusChange) onStatusChange('syncing', user);
       await hydrateFromCloud(user);
-      if (onStatusChange) onStatusChange('synced');
+      if (onStatusChange) onStatusChange('synced', user);
     } else {
       authUser = null;
-      if (onStatusChange) onStatusChange('local');
+      if (onStatusChange) onStatusChange('local', null);
     }
   });
 
