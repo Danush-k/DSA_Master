@@ -7,8 +7,12 @@ import {
   Search, Moon, Sun, ChevronRight, Check, ExternalLink, StickyNote,
   Menu, X, Filter, Clock, Flame, Calendar, ChevronDown, ChevronUp, BarChart3, Info,
   ArrowUpDown, Binary, ChevronsLeftRight, Columns, GitBranch, Grid, Hash, Layers,
-  Link as LinkIcon, Network, Sparkles, Star, TrendingUp, Type, Zap
+  Link as LinkIcon, Network, Sparkles, Star, TrendingUp, Type, Zap,
+  Cloud, CloudOff, RefreshCw
 } from 'lucide-react';
+import { auth } from './firebaseClient.js';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { initDbSync } from './services/dbSync.js';
 
 // Custom Youtube SVG Icon since brand icons are not exported in this lucide-react version
 const Youtube = ({ size = 24, fill = "currentColor", ...props }) => (
@@ -244,7 +248,7 @@ function Sidebar({ isOpen, onClose }) {
 // ═══════════════════════════════════════════════════════════════
 // HEADER
 // ═══════════════════════════════════════════════════════════════
-function Header({ title, onMenuClick, onManageProfiles }) {
+function Header({ title, onMenuClick, onManageProfiles, syncStatus, user, onAuthClick }) {
   const theme = useThemeStore((s) => s.theme);
   const toggleTheme = useThemeStore((s) => s.toggleTheme);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -354,6 +358,40 @@ function Header({ title, onMenuClick, onManageProfiles }) {
             </div>
           )}
         </div>
+
+        {/* Cloud Sync Status */}
+        <button
+          className="cloud-sync-btn"
+          onClick={onAuthClick}
+          title={
+            syncStatus === 'local-only' ? 'Cloud Sync Unavailable (Config Missing)' :
+            syncStatus === 'local' ? 'Cloud Sync Disconnected (Click to Log In)' :
+            syncStatus === 'syncing' ? 'Syncing with Cloud Database...' :
+            'Synchronized with Cloud Database'
+          }
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 32,
+            height: 32,
+            borderRadius: 'var(--radius-md)',
+            background: 'var(--bg-tertiary)',
+            border: '1px solid var(--border-primary)',
+            color: syncStatus === 'synced' ? 'var(--success)' : syncStatus === 'syncing' ? 'var(--warning)' : 'var(--text-tertiary)',
+            cursor: syncStatus === 'local-only' ? 'not-allowed' : 'pointer',
+            transition: 'all var(--transition-fast)'
+          }}
+          disabled={syncStatus === 'local-only'}
+        >
+          {syncStatus === 'syncing' ? (
+            <RefreshCw size={16} className="spin" />
+          ) : syncStatus === 'local' || syncStatus === 'local-only' ? (
+            <CloudOff size={16} />
+          ) : (
+            <Cloud size={16} />
+          )}
+        </button>
 
         <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
@@ -2167,6 +2205,18 @@ function AppLayout() {
   const switchNotesProfile = useNotesStore((s) => s.switchProfile);
   const switchRevisionProfile = useRevisionStore((s) => s.switchProfile);
 
+  const [syncStatus, setSyncStatus] = useState('local'); // 'local-only', 'local', 'syncing', 'synced'
+  const [user, setUser] = useState(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+
+  // Initialize DB Sync
+  useEffect(() => {
+    initDbSync((status, currentUser) => {
+      setSyncStatus(status);
+      setUser(currentUser);
+    });
+  }, []);
+
   // Keep notes and revisions store profiles in sync with the active progress profile
   useEffect(() => {
     switchNotesProfile(activeProfileId);
@@ -2205,6 +2255,12 @@ function AppLayout() {
     return 'Danush';
   };
 
+  const handleAuthClick = () => {
+    if (syncStatus !== 'local-only') {
+      setAuthModalOpen(true);
+    }
+  };
+
   return (
     <div className="app-layout">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -2213,6 +2269,9 @@ function AppLayout() {
           title={getPageTitle()}
           onMenuClick={() => setSidebarOpen(true)}
           onManageProfiles={() => setManagerOpen(true)}
+          syncStatus={syncStatus}
+          user={user}
+          onAuthClick={handleAuthClick}
         />
         <Routes>
           <Route path="/" element={<DashboardPage />} />
@@ -2226,7 +2285,154 @@ function AppLayout() {
         </Routes>
       </div>
       {managerOpen && <ProfileManagerModal onClose={() => setManagerOpen(false)} />}
+      {authModalOpen && <AuthModal onClose={() => setAuthModalOpen(false)} user={user} />}
     </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLOUD AUTH MODAL
+// ═══════════════════════════════════════════════════════════════
+function AuthModal({ onClose, user }) {
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!email.trim() || !password.trim()) return;
+    setError('');
+    setLoading(true);
+
+    try {
+      if (isSignUp) {
+        await createUserWithEmailAndPassword(auth, email.trim(), password.trim());
+      } else {
+        await signInWithEmailAndPassword(auth, email.trim(), password.trim());
+      }
+      onClose();
+    } catch (err) {
+      console.error(err);
+      let errMsg = err.message;
+      if (err.code === 'auth/wrong-password') errMsg = 'Incorrect password.';
+      if (err.code === 'auth/user-not-found') errMsg = 'User not found.';
+      if (err.code === 'auth/email-already-in-use') errMsg = 'Email already in use.';
+      setError(errMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      onClose();
+    } catch (err) {
+      console.error("Log out failed:", err);
+    }
+  };
+
+  return createPortal(
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-title">☁️ Cloud Database Sync</div>
+          <button className="modal-close" onClick={onClose}><X size={18} /></button>
+        </div>
+        {user ? (
+          <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'center' }}>
+            <p style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
+              Connected to cloud database as:
+            </p>
+            <div style={{
+              padding: '12px 16px', background: 'var(--bg-tertiary)',
+              border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)',
+              fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)'
+            }}>
+              {user.email}
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--success)' }}>
+              🟢 Your progress, notes, and revisions are being synchronized in real-time.
+            </p>
+            <button className="btn btn-secondary" onClick={handleLogout} style={{ width: '100%' }}>
+              Disconnect / Log Out
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                Sync your DSA sheet data across multiple devices. Register or sign in below.
+              </p>
+
+              {error && (
+                <div style={{
+                  padding: '10px 12px', background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 'var(--radius-md)',
+                  color: 'var(--error)', fontSize: 13, lineHeight: 1.4
+                }}>
+                  ⚠️ {error}
+                </div>
+              )}
+
+              <div className="notes-field">
+                <label>Email Address</label>
+                <input
+                  type="email"
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required
+                  style={{
+                    width: '100%', padding: '8px 12px', background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)',
+                    color: 'var(--text-primary)', fontSize: 14,
+                  }}
+                />
+              </div>
+
+              <div className="notes-field">
+                <label>Password</label>
+                <input
+                  type="password"
+                  placeholder="Min 6 characters"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  style={{
+                    width: '100%', padding: '8px 12px', background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)',
+                    color: 'var(--text-primary)', fontSize: 14,
+                  }}
+                />
+              </div>
+
+              <div style={{ fontSize: 13, textAlign: 'center', marginTop: 4 }}>
+                <span style={{ color: 'var(--text-secondary)' }}>
+                  {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsSignUp(!isSignUp)}
+                  style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                >
+                  {isSignUp ? 'Sign In' : 'Sign Up'}
+                </button>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={onClose} disabled={loading}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={loading}>
+                {loading ? 'Processing...' : isSignUp ? 'Sign Up' : 'Sign In'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>,
+    document.body
   );
 }
 
