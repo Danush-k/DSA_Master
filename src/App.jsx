@@ -8,7 +8,7 @@ import {
   Menu, X, Filter, Clock, Flame, Calendar, ChevronDown, ChevronUp, BarChart3, Info,
   ArrowUpDown, Binary, ChevronsLeftRight, Columns, GitBranch, Grid, Hash, Layers,
   Link as LinkIcon, Network, Sparkles, Star, TrendingUp, Type, Zap,
-  Cloud, CloudOff, RefreshCw
+  Cloud, CloudOff, RefreshCw, User
 } from 'lucide-react';
 import { auth } from './firebaseClient.js';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
@@ -209,6 +209,7 @@ function Sidebar({ isOpen, onClose }) {
     { path: '/patterns', label: 'Patterns', icon: Target },
     { path: '/revision', label: 'Revision', icon: RotateCcw, badge: dueCount || null },
     { path: '/bookmarks', label: 'Bookmarks', icon: Bookmark },
+    { path: '/profile', label: 'Profile', icon: User },
   ];
 
   return (
@@ -346,6 +347,14 @@ function Header({ title, onMenuClick, onManageProfiles, syncStatus, user, onAuth
                 </button>
               ))}
               <div className="profile-dropdown-divider" />
+              <Link
+                to="/profile"
+                className="profile-dropdown-item"
+                onClick={() => setProfileDropdownOpen(false)}
+                style={{ color: 'inherit' }}
+              >
+                👤 View Profile Page
+              </Link>
               <button
                 className="profile-dropdown-item"
                 onClick={() => {
@@ -2200,6 +2209,7 @@ function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [managerOpen, setManagerOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   const activeProfileId = useProgressStore((s) => s.activeProfileId);
   const switchNotesProfile = useNotesStore((s) => s.switchProfile);
@@ -2207,7 +2217,6 @@ function AppLayout() {
 
   const [syncStatus, setSyncStatus] = useState('local'); // 'local-only', 'local', 'syncing', 'synced'
   const [user, setUser] = useState(null);
-  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   // Initialize DB Sync
   useEffect(() => {
@@ -2252,12 +2261,18 @@ function AppLayout() {
     if (location.pathname.startsWith('/patterns/')) return 'Pattern Detail';
     if (location.pathname === '/revision') return 'Revision';
     if (location.pathname === '/bookmarks') return 'Bookmarks';
+    if (location.pathname === '/login') return 'Account Login';
+    if (location.pathname === '/profile') return 'User Profile';
     return 'Danush';
   };
 
   const handleAuthClick = () => {
     if (syncStatus !== 'local-only') {
-      setAuthModalOpen(true);
+      if (user) {
+        navigate('/profile');
+      } else {
+        navigate('/login');
+      }
     }
   };
 
@@ -2282,10 +2297,455 @@ function AppLayout() {
           <Route path="/patterns/:patternId" element={<PatternDetailPage />} />
           <Route path="/revision" element={<RevisionPage />} />
           <Route path="/bookmarks" element={<BookmarksPage />} />
+          <Route path="/login" element={<LoginPage user={user} />} />
+          <Route path="/profile" element={<ProfilePage user={user} syncStatus={syncStatus} />} />
         </Routes>
       </div>
       {managerOpen && <ProfileManagerModal onClose={() => setManagerOpen(false)} />}
-      {authModalOpen && <AuthModal onClose={() => setAuthModalOpen(false)} user={user} />}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LEETCODE-STYLE LOGIN PAGE
+// ═══════════════════════════════════════════════════════════════
+function LoginPage({ user }) {
+  const navigate = useNavigate();
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      navigate('/profile');
+    }
+  }, [user, navigate]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!email.trim() || !password.trim()) return;
+    setError('');
+    setLoading(true);
+
+    try {
+      if (isSignUp) {
+        await createUserWithEmailAndPassword(auth, email.trim(), password.trim());
+      } else {
+        await signInWithEmailAndPassword(auth, email.trim(), password.trim());
+      }
+      navigate('/');
+    } catch (err) {
+      console.error(err);
+      let errMsg = err.message;
+      if (err.code === 'auth/wrong-password') errMsg = 'Incorrect password.';
+      if (err.code === 'auth/user-not-found') errMsg = 'User not found.';
+      if (err.code === 'auth/email-already-in-use') errMsg = 'Email already in use.';
+      setError(errMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      navigate('/');
+    } catch (err) {
+      console.error(err);
+      let errMsg = err.message;
+      if (err.code === 'auth/popup-closed-by-user') errMsg = 'Sign-in popup closed before completion.';
+      setError(errMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="lc-login-container">
+      <div className="lc-login-card">
+        <div className="lc-login-header">
+          <div className="lc-logo-circle">⚡</div>
+          <h2 className="lc-login-title">DSA Mastery</h2>
+        </div>
+
+        <div className="lc-tab-container">
+          <button
+            type="button"
+            className={`lc-tab-btn ${!isSignUp ? 'active' : ''}`}
+            onClick={() => { setIsSignUp(false); setError(''); }}
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            className={`lc-tab-btn ${isSignUp ? 'active' : ''}`}
+            onClick={() => { setIsSignUp(true); setError(''); }}
+          >
+            Register
+          </button>
+        </div>
+
+        {error && (
+          <div style={{
+            padding: '10px 12px', background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 'var(--radius-md)',
+            color: 'var(--error)', fontSize: 13, lineHeight: 1.4, textAlign: 'center'
+          }}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="lc-input-group">
+            <label>Email Address</label>
+            <input
+              type="email"
+              placeholder="name@example.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              required
+              className="lc-input"
+            />
+          </div>
+
+          <div className="lc-input-group">
+            <label>Password</label>
+            <input
+              type="password"
+              placeholder="Min 6 characters"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required={!loading}
+              className="lc-input"
+            />
+          </div>
+
+          <button type="submit" className="lc-submit-btn" disabled={loading}>
+            {loading ? 'Processing...' : isSignUp ? 'Sign Up' : 'Sign In'}
+          </button>
+        </form>
+
+        <div className="lc-divider">
+          <span>or connect with</span>
+        </div>
+
+        <button type="button" className="lc-google-btn" onClick={handleGoogleSignIn} disabled={loading}>
+          <svg viewBox="0 0 24 24" width="18" height="18" style={{ minWidth: 18 }}>
+            <path
+              fill="#4285F4"
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+            />
+            <path
+              fill="#34A853"
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+            />
+            <path
+              fill="#FBBC05"
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+            />
+            <path
+              fill="#EA4335"
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+            />
+          </svg>
+          Continue with Google
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LEETCODE-STYLE PROFILE PAGE
+// ═══════════════════════════════════════════════════════════════
+function ProfilePage({ user, syncStatus }) {
+  const navigate = useNavigate();
+  const allQuestions = useAllQuestions();
+  const activeProfileId = useProgressStore((s) => s.activeProfileId);
+  const profile = useProgressStore((s) => s.profiles[activeProfileId] || {});
+  
+  // Solved and status metrics
+  const questionStatus = profile.questionStatus || {};
+  const bookmarks = profile.bookmarks || [];
+  const customQuestions = profile.customQuestions || [];
+  const currentStreak = profile.currentStreak || 0;
+  const longestStreak = profile.longestStreak || 0;
+  
+  // Calculate total counts by difficulty
+  const totalEasy = allQuestions.filter(q => q.difficulty === 'Easy').length;
+  const totalMedium = allQuestions.filter(q => q.difficulty === 'Medium').length;
+  const totalHard = allQuestions.filter(q => q.difficulty === 'Hard').length;
+  const totalProblems = allQuestions.length;
+
+  const solvedEasy = allQuestions.filter(q => q.difficulty === 'Easy' && questionStatus[q.id] === 'solved').length;
+  const solvedMedium = allQuestions.filter(q => q.difficulty === 'Medium' && questionStatus[q.id] === 'solved').length;
+  const solvedHard = allQuestions.filter(q => q.difficulty === 'Hard' && questionStatus[q.id] === 'solved').length;
+  const totalSolved = solvedEasy + solvedMedium + solvedHard;
+
+  const easyPercent = totalEasy ? Math.round((solvedEasy / totalEasy) * 100) : 0;
+  const mediumPercent = totalMedium ? Math.round((solvedMedium / totalMedium) * 100) : 0;
+  const hardPercent = totalHard ? Math.round((solvedHard / totalHard) * 100) : 0;
+  const totalPercent = totalProblems ? Math.round((totalSolved / totalProblems) * 100) : 0;
+
+  // Revisions stats
+  const revisions = useRevisionStore((s) => s.profiles[activeProfileId] || {});
+  const totalRevisions = Object.keys(revisions).length;
+
+  // Notes stats
+  const notes = useNotesStore((s) => s.profiles[activeProfileId] || {});
+  const totalNotes = Object.keys(notes).length;
+
+  // Recent activity list
+  const solveHistory = profile.solveHistory || [];
+  const fallbackHistory = useMemo(() => {
+    if (solveHistory.length > 0) return solveHistory;
+    return Object.entries(questionStatus)
+      .filter(([_, status]) => status === 'solved')
+      .map(([id]) => ({ questionId: parseInt(id), solvedAt: null }))
+      .slice(0, 10);
+  }, [solveHistory, questionStatus]);
+
+  // Helper to format timestamps
+  const formatTimeAgo = (dateString) => {
+    if (!dateString) return 'Previously';
+    const date = new Date(dateString);
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
+    if (seconds < 60) return 'Just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days === 1) return 'Yesterday';
+    return `${days}d ago`;
+  };
+
+  // Profile manager modal trigger
+  const [managerOpen, setManagerOpen] = useState(false);
+
+  // Backup data
+  const handleBackup = () => {
+    const backupStr = useProgressStore.getState().exportData();
+    const blob = new Blob([backupStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `dsa_mastery_backup_${activeProfileId}_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Sign out helper
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      navigate('/');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // SVG circular chart variables
+  const radius = 56;
+  const strokeWidth = 8;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (totalPercent / 100) * circumference;
+
+  return (
+    <div className="page-content">
+      <div className="profile-container">
+        {/* Left Column */}
+        <div className="profile-sidebar">
+          <div className="profile-card">
+            <div className="profile-user-info">
+              <div className="profile-avatar-large">
+                {profile.avatar || '🦊'}
+              </div>
+              <div className="profile-display-name">
+                {user?.displayName || profile.name}
+              </div>
+              {user?.email && (
+                <div className="profile-email">
+                  {user.email}
+                </div>
+              )}
+              {user?.metadata?.createdAt && (
+                <div className="profile-joined">
+                  Member since {new Date(parseInt(user.metadata.createdAt)).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}
+                </div>
+              )}
+              <div className="profile-status-pill">
+                <span style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: syncStatus === 'synced' ? 'var(--success)' : syncStatus === 'syncing' ? 'var(--warning)' : 'var(--text-tertiary)'
+                }}></span>
+                {syncStatus === 'synced' ? 'Cloud Synced' : syncStatus === 'syncing' ? 'Syncing...' : 'Guest Mode (Local)'}
+              </div>
+            </div>
+          </div>
+
+          <div className="profile-card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <h4 style={{ fontSize: 14, fontWeight: 700, borderBottom: '1px solid var(--border-primary)', paddingBottom: 8 }}>
+              Account Settings
+            </h4>
+            <button className="btn btn-secondary btn-sm" onClick={() => setManagerOpen(true)} style={{ width: '100%' }}>
+              ⚙️ Switch/Manage Profile
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={handleBackup} style={{ width: '100%' }}>
+              📥 Backup Data (JSON)
+            </button>
+            {user && (
+              <button className="btn btn-ghost btn-sm" onClick={handleLogout} style={{ width: '100%', color: 'var(--error)' }}>
+                🚪 Sign Out
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Right Column */}
+        <div className="profile-main-grid">
+          {/* Progress Ring and Difficulty Bars */}
+          <div className="profile-card">
+            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Progress Summary</h3>
+            <div className="profile-progress-stats">
+              {/* SVG Ring */}
+              <div className="profile-progress-circle-wrap">
+                <div className="progress-ring-container">
+                  <svg width="140" height="140">
+                    <circle
+                      cx="70"
+                      cy="70"
+                      r={radius}
+                      fill="transparent"
+                      stroke="var(--bg-primary)"
+                      strokeWidth={strokeWidth}
+                    />
+                    <circle
+                      cx="70"
+                      cy="70"
+                      r={radius}
+                      fill="transparent"
+                      stroke="var(--accent-primary)"
+                      strokeWidth={strokeWidth}
+                      strokeDasharray={circumference}
+                      strokeDashoffset={strokeDashoffset}
+                      strokeLinecap="round"
+                      transform="rotate(-90 70 70)"
+                      style={{ transition: 'stroke-dashoffset 0.8s ease-in-out' }}
+                    />
+                  </svg>
+                  <div className="progress-ring-text" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <span style={{ fontSize: 22, fontWeight: 800 }}>{totalPercent}%</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>{totalSolved}/{totalProblems}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Difficulty Bars */}
+              <div className="difficulty-bars-list">
+                {/* Easy */}
+                <div className="difficulty-bar-item">
+                  <div className="difficulty-bar-header">
+                    <span style={{ color: 'var(--easy)' }}>Easy</span>
+                    <div className="difficulty-bar-count">
+                      <span>{solvedEasy}</span>/{totalEasy}
+                    </div>
+                  </div>
+                  <div className="progress-bar">
+                    <div className="progress-bar-fill easy" style={{ width: `${easyPercent}%` }}></div>
+                  </div>
+                </div>
+
+                {/* Medium */}
+                <div className="difficulty-bar-item">
+                  <div className="difficulty-bar-header">
+                    <span style={{ color: 'var(--medium)' }}>Medium</span>
+                    <div className="difficulty-bar-count">
+                      <span>{solvedMedium}</span>/{totalMedium}
+                    </div>
+                  </div>
+                  <div className="progress-bar">
+                    <div className="progress-bar-fill medium" style={{ width: `${mediumPercent}%` }}></div>
+                  </div>
+                </div>
+
+                {/* Hard */}
+                <div className="difficulty-bar-item">
+                  <div className="difficulty-bar-header">
+                    <span style={{ color: 'var(--hard)' }}>Hard</span>
+                    <div className="difficulty-bar-count">
+                      <span>{solvedHard}</span>/{totalHard}
+                    </div>
+                  </div>
+                  <div className="progress-bar">
+                    <div className="progress-bar-fill hard" style={{ width: `${hardPercent}%` }}></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Stats Boxes */}
+          <div className="profile-streak-grid">
+            <div className="profile-stat-box">
+              <span className="profile-stat-box-icon">🔥</span>
+              <span className="profile-stat-box-val">{currentStreak}</span>
+              <span className="profile-stat-box-lbl">Current Streak</span>
+            </div>
+            <div className="profile-stat-box">
+              <span className="profile-stat-box-icon">🏆</span>
+              <span className="profile-stat-box-val">{longestStreak}</span>
+              <span className="profile-stat-box-lbl">Longest Streak</span>
+            </div>
+            <div className="profile-stat-box">
+              <span className="profile-stat-box-icon">📝</span>
+              <span className="profile-stat-box-val">{totalNotes}</span>
+              <span className="profile-stat-box-lbl">Study Notes</span>
+            </div>
+          </div>
+
+          {/* Recent Activity */}
+          <div className="profile-card">
+            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Recent Submissions</h3>
+            {fallbackHistory.length === 0 ? (
+              <p style={{ fontSize: 14, color: 'var(--text-secondary)', textAlign: 'center', padding: '24px 0' }}>
+                No recent activity. Start solving questions to populate your log!
+              </p>
+            ) : (
+              <div className="activity-timeline">
+                {fallbackHistory.map((item, idx) => {
+                  const q = allQuestions.find(x => x.id === item.questionId);
+                  if (!q) return null;
+                  const diffClass = q.difficulty.toLowerCase();
+                  return (
+                    <div className="activity-item" key={idx}>
+                      <span className={`activity-item-dot ${diffClass}`} />
+                      <div className="activity-details">
+                        <Link to="/sheet" className="activity-problem-link">
+                          {q.title}
+                        </Link>
+                        <span className={`badge badge-${diffClass}`} style={{ fontSize: 10, padding: '1px 6px' }}>
+                          {q.difficulty}
+                        </span>
+                      </div>
+                      <span className="activity-time">
+                        {formatTimeAgo(item.solvedAt)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      {managerOpen && <ProfileManagerModal onClose={() => setManagerOpen(false)} />}
     </div>
   );
 }

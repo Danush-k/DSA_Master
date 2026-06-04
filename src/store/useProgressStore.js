@@ -9,6 +9,7 @@ const DEFAULT_PROFILE_STATE = {
   longestStreak: 0,
   lastSolveDate: null,
   customQuestions: [],
+  solveHistory: [],
 };
 
 const useProgressStore = create(
@@ -75,20 +76,27 @@ const useProgressStore = create(
           const newStatus = { ...profile.questionStatus };
           const today = new Date().toISOString().split('T')[0];
           const newDailySolves = { ...profile.dailySolves };
+          let newSolveHistory = [...(profile.solveHistory || [])];
 
           if (current === status) {
             delete newStatus[questionId];
             if (status === 'solved' && (newDailySolves[today] || 0) > 0) {
               newDailySolves[today] = (newDailySolves[today] || 0) - 1;
             }
+            newSolveHistory = newSolveHistory.filter(item => item.questionId !== questionId);
           } else {
             if (status === 'solved' && current !== 'solved') {
               newDailySolves[today] = (newDailySolves[today] || 0) + 1;
+              newSolveHistory = [
+                { questionId, solvedAt: new Date().toISOString() },
+                ...newSolveHistory.filter(item => item.questionId !== questionId)
+              ].slice(0, 50);
             }
             if (current === 'solved' && status !== 'solved') {
               if ((newDailySolves[today] || 0) > 0) {
                 newDailySolves[today] = (newDailySolves[today] || 0) - 1;
               }
+              newSolveHistory = newSolveHistory.filter(item => item.questionId !== questionId);
             }
             newStatus[questionId] = status;
           }
@@ -118,6 +126,7 @@ const useProgressStore = create(
                 currentStreak,
                 longestStreak,
                 lastSolveDate,
+                solveHistory: newSolveHistory
               }
             }
           };
