@@ -11,8 +11,8 @@ import {
   Cloud, CloudOff, RefreshCw, User
 } from 'lucide-react';
 import { auth } from './firebaseClient.js';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { initDbSync } from './services/dbSync.js';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup, deleteUser } from 'firebase/auth';
+import { initDbSync, deleteUserCloudData } from './services/dbSync.js';
 
 // Custom Youtube SVG Icon since brand icons are not exported in this lucide-react version
 const Youtube = ({ size = 24, fill = "currentColor", ...props }) => (
@@ -2551,6 +2551,67 @@ function ProfilePage({ user, syncStatus }) {
     }
   };
 
+  // Delete user account and cascading data
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm(
+      "⚠️ WARNING: Are you sure you want to permanently delete your account?\n\n" +
+      "This will cascadingly delete ALL your profiles, solved progress, custom questions, notes, and revision data from the cloud database. This action CANNOT be undone."
+    );
+    if (!confirmed) return;
+
+    const secondConfirmed = window.confirm(
+      "CONFIRM ACCOUNT DELETION\n\n" +
+      "Please confirm once more. All your study progress will be erased forever."
+    );
+    if (!secondConfirmed) return;
+
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+      
+      // 1. Purge all records from Firestore
+      await deleteUserCloudData(currentUser);
+      
+      // 2. Delete auth user account
+      await deleteUser(currentUser);
+      
+      // 3. Clear Zustand local stores back to default
+      useProgressStore.setState({
+        profiles: {
+          'default': {
+            name: 'Danush',
+            avatar: '🦊',
+            questionStatus: {},
+            dailySolves: {},
+            bookmarks: [],
+            currentStreak: 0,
+            longestStreak: 0,
+            lastSolveDate: null,
+            customQuestions: [],
+            solveHistory: []
+          }
+        },
+        activeProfileId: 'default'
+      });
+      
+      useNotesStore.setState({
+        profiles: { 'default': {} },
+        activeProfileId: 'default'
+      });
+      
+      useRevisionStore.setState({
+        profiles: { 'default': {} },
+        activeProfileId: 'default'
+      });
+
+      alert("Your account and all associated data have been permanently deleted.");
+      navigate('/');
+    } catch (err) {
+      console.error(err);
+      alert(`Account deletion failed: ${err.message}. You may need to sign out and sign back in to verify your credentials before deleting your account.`);
+    }
+  };
+
   // SVG circular chart variables
   const radius = 56;
   const strokeWidth = 8;
@@ -2601,9 +2662,34 @@ function ProfilePage({ user, syncStatus }) {
               📥 Backup Data (JSON)
             </button>
             {user && (
-              <button className="btn btn-ghost btn-sm" onClick={handleLogout} style={{ width: '100%', color: 'var(--error)' }}>
-                🚪 Sign Out
-              </button>
+              <>
+                <button className="btn btn-secondary btn-sm" onClick={handleLogout} style={{ width: '100%' }}>
+                  🚪 Sign Out
+                </button>
+                <div style={{ borderTop: '1px solid var(--border-primary)', marginTop: 8, paddingTop: 8 }}>
+                  <button
+                    className="btn btn-sm"
+                    onClick={handleDeleteAccount}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      color: 'var(--error)',
+                      fontWeight: 600
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--error)';
+                      e.currentTarget.style.color = 'white';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                      e.currentTarget.style.color = 'var(--error)';
+                    }}
+                  >
+                    ⚠️ Delete Account
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>

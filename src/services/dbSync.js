@@ -6,7 +6,8 @@ import {
   getDocs,
   query,
   where,
-  collection
+  collection,
+  deleteDoc
 } from 'firebase/firestore';
 import useProgressStore from '../store/useProgressStore.js';
 import useNotesStore from '../store/useNotesStore.js';
@@ -319,3 +320,25 @@ async function hydrateFromCloud(user) {
     isHydrating = false;
   }
 }
+
+// Delete all cloud data for a user (cascading deletion)
+export async function deleteUserCloudData(user) {
+  if (!db || !user) return;
+  
+  const collections = ['profiles', 'user_progress', 'user_notes', 'user_revisions', 'custom_questions'];
+  
+  for (const collName of collections) {
+    try {
+      const q = query(collection(db, collName), where('userId', '==', user.uid));
+      const snap = await getDocs(q);
+      const deletePromises = [];
+      snap.forEach((docSnap) => {
+        deletePromises.push(deleteDoc(docSnap.ref));
+      });
+      await Promise.all(deletePromises);
+    } catch (err) {
+      console.error(`Failed to delete collection ${collName} for user:`, err);
+    }
+  }
+}
+
