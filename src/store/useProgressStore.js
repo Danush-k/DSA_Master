@@ -17,8 +17,8 @@ const useProgressStore = create(
       activeProfileId: 'default',
       profiles: {
         'default': {
-          name: 'Default Profile',
-          avatar: '⚡',
+          name: 'Danush',
+          avatar: '🦊',
           ...DEFAULT_PROFILE_STATE
         }
       },

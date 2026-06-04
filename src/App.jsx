@@ -213,7 +213,7 @@ function Sidebar({ isOpen, onClose }) {
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-logo">
           <div className="sidebar-logo-icon">⚡</div>
-          <span className="sidebar-logo-text">DSA Mastery</span>
+          <span className="sidebar-logo-text">Danush</span>
         </div>
         <nav className="sidebar-nav">
           <div className="sidebar-section-label">Main</div>
@@ -2173,6 +2173,23 @@ function AppLayout() {
     switchRevisionProfile(activeProfileId);
   }, [activeProfileId, switchNotesProfile, switchRevisionProfile]);
 
+  // Ensure 'default' profile is automatically renamed to 'Danush' for existing users
+  useEffect(() => {
+    const progressStore = useProgressStore.getState();
+    if (progressStore.profiles['default'] && progressStore.profiles['default'].name === 'Default Profile') {
+      useProgressStore.setState((prev) => ({
+        profiles: {
+          ...prev.profiles,
+          'default': {
+            ...prev.profiles['default'],
+            name: 'Danush',
+            avatar: '🦊'
+          }
+        }
+      }));
+    }
+  }, []);
+
   const getPageTitle = () => {
     if (location.pathname === '/') return 'Dashboard';
     if (location.pathname === '/topics') return 'Topics';
@@ -2185,7 +2202,7 @@ function AppLayout() {
     if (location.pathname.startsWith('/patterns/')) return 'Pattern Detail';
     if (location.pathname === '/revision') return 'Revision';
     if (location.pathname === '/bookmarks') return 'Bookmarks';
-    return 'DSA Mastery';
+    return 'Danush';
   };
 
   return (
