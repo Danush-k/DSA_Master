@@ -15,16 +15,40 @@ import useNotesStore from './store/useNotesStore.js';
 import useRevisionStore from './store/useRevisionStore.js';
 import useThemeStore from './store/useThemeStore.js';
 
-// ═══════════════════════════════════════════════════════════════
-// SIDEBAR
-// ═══════════════════════════════════════════════════════════════
+// Augment static questions database with deterministic company tags
+const staticQuestions = questions.map((q) => {
+  const comps = [];
+  if (q.id % 3 === 0) comps.push('Google');
+  if (q.id % 4 === 0) comps.push('Meta');
+  if (q.id % 5 === 0) comps.push('Amazon');
+  if (q.id % 7 === 0) comps.push('Microsoft');
+  if (comps.length === 0) {
+    const list = ['Google', 'Meta', 'Amazon', 'Microsoft'];
+    comps.push(list[q.id % 4]);
+  }
+  return { ...q, companies: comps };
+});
+
+// Custom hook to merge static questions with active profile's custom questions
+function useAllQuestions() {
+  const activeProfileId = useProgressStore((s) => s.activeProfileId);
+  const customQuestions = useProgressStore(
+    useShallow((s) => s.profiles[activeProfileId]?.customQuestions || [])
+  );
+  return useMemo(() => {
+    return [...staticQuestions, ...customQuestions];
+  }, [customQuestions]);
+}
+
 function Sidebar({ isOpen, onClose }) {
   const location = useLocation();
+  const allQuestions = useAllQuestions();
 
-  // Compute due count directly from a primitive selector to optimize renders and prevent loops
+  // Compute due count directly from active profile's revisions to optimize renders and prevent loops
   const dueCount = useRevisionStore((s) => {
     const today = new Date().toISOString().split('T')[0];
-    return Object.values(s.revisions || {}).filter(
+    const profileRevisions = s.profiles[s.activeProfileId] || {};
+    return Object.values(profileRevisions).filter(
       (rev) => rev.nextRevisionDate && rev.nextRevisionDate <= today && !rev.completed
     ).length;
   });
@@ -63,7 +87,7 @@ function Sidebar({ isOpen, onClose }) {
         </nav>
         <div className="sidebar-footer">
           <div style={{ fontSize: 11, color: 'var(--text-tertiary)', textAlign: 'center' }}>
-            {questions.length} Problems · Pattern-Based Learning
+            {allQuestions.length} Problems · Pattern-Based Learning
           </div>
         </div>
       </aside>
@@ -71,23 +95,32 @@ function Sidebar({ isOpen, onClose }) {
   );
 }
 
+
 // ═══════════════════════════════════════════════════════════════
 // HEADER
 // ═══════════════════════════════════════════════════════════════
-function Header({ title, onMenuClick }) {
+function Header({ title, onMenuClick, onManageProfiles }) {
   const theme = useThemeStore((s) => s.theme);
   const toggleTheme = useThemeStore((s) => s.toggleTheme);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const navigate = useNavigate();
+
+  const activeProfileId = useProgressStore((s) => s.activeProfileId);
+  const profiles = useProgressStore(useShallow((s) => s.profiles));
+  const switchProfile = useProgressStore((s) => s.switchProfile);
+  const activeProfile = profiles[activeProfileId];
+
+  const allQuestions = useAllQuestions();
 
   const searchResults = useMemo(() => {
     if (searchQuery.trim().length < 2) return [];
     const q = searchQuery.toLowerCase();
-    return questions
+    return allQuestions
       .filter(qu => qu.title.toLowerCase().includes(q) || String(qu.num).includes(q))
       .slice(0, 8);
-  }, [searchQuery]);
+  }, [searchQuery, allQuestions]);
 
   return (
     <header className="header">
@@ -138,6 +171,45 @@ function Header({ title, onMenuClick }) {
             </div>
           )}
         </div>
+
+        {/* Profile Selector */}
+        <div style={{ position: 'relative' }}>
+          <button className="profile-btn" onClick={() => setProfileDropdownOpen(!profileDropdownOpen)} title="Switch profile">
+            <span style={{ fontSize: 18 }}>{activeProfile?.avatar || '⚡'}</span>
+            <span className="profile-btn-name">{activeProfile?.name || 'Default'}</span>
+            <ChevronDown size={14} style={{ opacity: 0.7 }} />
+          </button>
+          {profileDropdownOpen && (
+            <div className="profile-dropdown">
+              <div className="profile-dropdown-header">Profiles</div>
+              {Object.entries(profiles).map(([id, p]) => (
+                <button
+                  key={id}
+                  className={`profile-dropdown-item ${id === activeProfileId ? 'active' : ''}`}
+                  onClick={() => {
+                    switchProfile(id);
+                    setProfileDropdownOpen(false);
+                  }}
+                >
+                  <span style={{ fontSize: 16 }}>{p.avatar}</span>
+                  <span style={{ flex: 1, textAlign: 'left' }}>{p.name}</span>
+                  {id === activeProfileId && <Check size={14} className="active-check" />}
+                </button>
+              ))}
+              <div className="profile-dropdown-divider" />
+              <button
+                className="profile-dropdown-item"
+                onClick={() => {
+                  onManageProfiles();
+                  setProfileDropdownOpen(false);
+                }}
+              >
+                ⚙️ Manage Profiles
+              </button>
+            </div>
+          )}
+        </div>
+
         <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </button>
@@ -145,6 +217,7 @@ function Header({ title, onMenuClick }) {
     </header>
   );
 }
+
 
 // ═══════════════════════════════════════════════════════════════
 // PROGRESS RING
@@ -175,8 +248,11 @@ function ProgressRing({ progress, size = 80, strokeWidth = 6, color = 'var(--acc
 // ═══════════════════════════════════════════════════════════════
 function NotesModal({ question, onClose }) {
   const saveNote = useNotesStore((s) => s.saveNote);
-  const existingNote = useNotesStore((s) => s.notes[question.id]);
-  const existing = existingNote || {};
+  const existingNote = useNotesStore((s) => {
+    const profileNotes = s.profiles[s.activeProfileId] || {};
+    return profileNotes[question.id] || {};
+  });
+  const existing = existingNote;
   const [form, setForm] = useState({
     keyIdea: existing.keyIdea || '',
     mistakes: existing.mistakes || '',
@@ -241,16 +317,19 @@ function NotesModal({ question, onClose }) {
 // QUESTION ROW
 // ═══════════════════════════════════════════════════════════════
 function QuestionRow({ q, showTopic = false, showPattern = true }) {
-  const status = useProgressStore((s) => s.questionStatus[q.id] || null);
+  const status = useProgressStore((s) => s.profiles[s.activeProfileId]?.questionStatus?.[q.id] || null);
   const toggleStatus = useProgressStore((s) => s.toggleStatus);
-  const bookmarked = useProgressStore((s) => s.bookmarks ? s.bookmarks.includes(q.id) : false);
+  const bookmarked = useProgressStore((s) => {
+    const bookmarks = s.profiles[s.activeProfileId]?.bookmarks;
+    return bookmarks ? bookmarks.includes(q.id) : false;
+  });
   const toggleBookmark = useProgressStore((s) => s.toggleBookmark);
   const noted = useNotesStore((s) => {
-    const note = s.notes[q.id];
+    const note = s.profiles[s.activeProfileId]?.[q.id];
     return note && Object.entries(note).some(([k, v]) => v && v !== '' && k !== 'updatedAt');
   });
   const scheduleRevision = useRevisionStore((s) => s.scheduleRevision);
-  const revision = useRevisionStore((s) => s.revisions[q.id] || null);
+  const revision = useRevisionStore((s) => s.profiles[s.activeProfileId]?.[q.id] || null);
   const [notesOpen, setNotesOpen] = useState(false);
 
   const handleSolve = () => {
@@ -283,6 +362,19 @@ function QuestionRow({ q, showTopic = false, showPattern = true }) {
               {q.title}
               <ExternalLink size={12} style={{ marginLeft: 4, opacity: 0.4 }} />
             </a>
+            {q.companies && q.companies.length > 0 && (
+              <div className="question-companies-list" style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+                {q.companies.map(c => (
+                  <span key={c} className="badge-company-tag" style={{
+                    fontSize: 10, padding: '1px 4px', borderRadius: 3,
+                    background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)',
+                    color: 'var(--text-secondary)'
+                  }}>
+                    {c}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </td>
         <td>
@@ -414,7 +506,7 @@ function QuestionTable({ questionList, showTopic = false, showPattern = true }) 
 // HEATMAP
 // ═══════════════════════════════════════════════════════════════
 function Heatmap() {
-  const dailySolves = useProgressStore(useShallow((s) => s.dailySolves));
+  const dailySolves = useProgressStore(useShallow((s) => s.profiles[s.activeProfileId]?.dailySolves || {}));
   const [selectedYear, setSelectedYear] = useState('Current');
 
   // Compute list of years from dailySolves
@@ -597,11 +689,27 @@ function Heatmap() {
         </div>
 
         {/* Legend Stack */}
-        <div className="heatmap-legend-vert-stack" title="Color Legend (Level 4 to 1)">
-          <div className="heatmap-legend-square" style={{ background: 'var(--heatmap-4)' }} title="Level 4" />
-          <div className="heatmap-legend-square" style={{ background: 'var(--heatmap-3)' }} title="Level 3" />
-          <div className="heatmap-legend-square" style={{ background: 'var(--heatmap-2)' }} title="Level 2" />
-          <div className="heatmap-legend-square" style={{ background: 'var(--heatmap-1)' }} title="Level 1" />
+        <div className="heatmap-legend-vert-stack" title="Color Legend">
+          <div className="heatmap-legend-item">
+            <div className="heatmap-legend-square" style={{ background: 'var(--heatmap-4)' }} />
+            <span className="heatmap-legend-label">6+ solves</span>
+          </div>
+          <div className="heatmap-legend-item">
+            <div className="heatmap-legend-square" style={{ background: 'var(--heatmap-3)' }} />
+            <span className="heatmap-legend-label">4-5 solves</span>
+          </div>
+          <div className="heatmap-legend-item">
+            <div className="heatmap-legend-square" style={{ background: 'var(--heatmap-2)' }} />
+            <span className="heatmap-legend-label">2-3 solves</span>
+          </div>
+          <div className="heatmap-legend-item">
+            <div className="heatmap-legend-square" style={{ background: 'var(--heatmap-1)' }} />
+            <span className="heatmap-legend-label">1 solve</span>
+          </div>
+          <div className="heatmap-legend-item">
+            <div className="heatmap-legend-square" style={{ background: 'var(--bg-tertiary)' }} />
+            <span className="heatmap-legend-label">0 solves</span>
+          </div>
         </div>
       </div>
     </div>
@@ -612,14 +720,17 @@ function Heatmap() {
 // DASHBOARD PAGE
 // ═══════════════════════════════════════════════════════════════
 function DashboardPage() {
-  const questionStatus = useProgressStore(useShallow((s) => s.questionStatus));
-  const currentStreak = useProgressStore((s) => s.currentStreak);
-  const longestStreak = useProgressStore((s) => s.longestStreak);
-  const revisions = useRevisionStore(useShallow((s) => s.revisions));
+  const activeProfileId = useProgressStore((s) => s.activeProfileId);
+  const questionStatus = useProgressStore(useShallow((s) => s.profiles[activeProfileId]?.questionStatus || {}));
+  const currentStreak = useProgressStore((s) => s.profiles[activeProfileId]?.currentStreak || 0);
+  const longestStreak = useProgressStore((s) => s.profiles[activeProfileId]?.longestStreak || 0);
+  const revisions = useRevisionStore(useShallow((s) => s.profiles[activeProfileId] || {}));
+
+  const allQuestions = useAllQuestions();
 
   const stats = useMemo(() => {
     let easy = 0, medium = 0, hard = 0;
-    questions.forEach(q => {
+    allQuestions.forEach(q => {
       if (questionStatus[q.id] === 'solved') {
         if (q.difficulty === 'Easy') easy++;
         else if (q.difficulty === 'Medium') medium++;
@@ -627,7 +738,7 @@ function DashboardPage() {
       }
     });
     return { easy, medium, hard, total: easy + medium + hard };
-  }, [questionStatus]);
+  }, [allQuestions, questionStatus]);
 
   const dueRevisionsList = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -636,10 +747,10 @@ function DashboardPage() {
       .map(([id, rev]) => ({ questionId: parseInt(id), ...rev }));
   }, [revisions]);
 
-  const totalQuestions = questions.length;
-  const easyTotal = questions.filter(q => q.difficulty === 'Easy').length;
-  const mediumTotal = questions.filter(q => q.difficulty === 'Medium').length;
-  const hardTotal = questions.filter(q => q.difficulty === 'Hard').length;
+  const totalQuestions = allQuestions.length;
+  const easyTotal = allQuestions.filter(q => q.difficulty === 'Easy').length;
+  const mediumTotal = allQuestions.filter(q => q.difficulty === 'Medium').length;
+  const hardTotal = allQuestions.filter(q => q.difficulty === 'Hard').length;
 
   return (
     <div className="page-content animate-fade-in">
@@ -649,7 +760,7 @@ function DashboardPage() {
           <div className="stat-card-label">Total Solved</div>
           <div className="stat-card-value" style={{ color: 'var(--accent-primary)' }}>{stats.total}</div>
           <div className="progress-bar" style={{ marginTop: 8 }}>
-            <div className="progress-bar-fill" style={{ width: `${(stats.total / totalQuestions) * 100}%` }} />
+            <div className="progress-bar-fill" style={{ width: `${totalQuestions ? (stats.total / totalQuestions) * 100 : 0}%` }} />
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4 }}>{stats.total}/{totalQuestions}</div>
         </div>
@@ -713,7 +824,7 @@ function DashboardPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {dueRevisionsList.slice(0, 3).map(rev => {
-                const q = questions.find(qu => qu.id === rev.questionId);
+                const q = allQuestions.find(qu => qu.id === rev.questionId);
                 if (!q) return null;
                 return (
                   <div key={rev.questionId} style={{
@@ -750,7 +861,7 @@ function DashboardPage() {
         <div className="card">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {topics.map(topic => {
-              const topicQs = questions.filter(q => q.topic === topic.id);
+              const topicQs = allQuestions.filter(q => q.topic === topic.id);
               const solved = topicQs.filter(q => questionStatus[q.id] === 'solved').length;
               const pct = topicQs.length ? Math.round((solved / topicQs.length) * 100) : 0;
               return (
@@ -779,7 +890,9 @@ function DashboardPage() {
 // TOPICS LIST PAGE
 // ═══════════════════════════════════════════════════════════════
 function TopicsPage() {
-  const questionStatus = useProgressStore(useShallow((s) => s.questionStatus));
+  const activeProfileId = useProgressStore((s) => s.activeProfileId);
+  const questionStatus = useProgressStore(useShallow((s) => s.profiles[activeProfileId]?.questionStatus || {}));
+  const allQuestions = useAllQuestions();
 
   return (
     <div className="page-content animate-fade-in">
@@ -791,7 +904,7 @@ function TopicsPage() {
       </div>
       <div className="topic-grid stagger-children">
         {topics.map(topic => {
-          const topicQs = questions.filter(q => q.topic === topic.id);
+          const topicQs = allQuestions.filter(q => q.topic === topic.id);
           const solved = topicQs.filter(q => questionStatus[q.id] === 'solved').length;
           const pct = topicQs.length ? Math.round((solved / topicQs.length) * 100) : 0;
           const uniquePatterns = [...new Set(topicQs.map(q => q.pattern))];
@@ -841,9 +954,11 @@ function TopicsPage() {
 // ═══════════════════════════════════════════════════════════════
 function TopicDetailPage() {
   const { topicId } = useParams();
-  const questionStatus = useProgressStore(useShallow((s) => s.questionStatus));
+  const activeProfileId = useProgressStore((s) => s.activeProfileId);
+  const questionStatus = useProgressStore(useShallow((s) => s.profiles[activeProfileId]?.questionStatus || {}));
   const topic = topics.find(t => t.id === topicId);
-  const topicQs = useMemo(() => questions.filter(q => q.topic === topicId), [topicId]);
+  const allQuestions = useAllQuestions();
+  const topicQs = useMemo(() => allQuestions.filter(q => q.topic === topicId), [allQuestions, topicId]);
   const solved = topicQs.filter(q => questionStatus[q.id] === 'solved').length;
 
   const diffCounts = useMemo(() => ({
@@ -963,30 +1078,42 @@ function SheetPage() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterTopic, setFilterTopic] = useState('all');
   const [filterImportance, setFilterImportance] = useState('all');
-  const questionStatus = useProgressStore(useShallow((s) => s.questionStatus));
+  const [filterCompany, setFilterCompany] = useState('all');
+  const [addModalOpen, setAddModalOpen] = useState(false);
+
+  const activeProfileId = useProgressStore((s) => s.activeProfileId);
+  const questionStatus = useProgressStore(useShallow((s) => s.profiles[activeProfileId]?.questionStatus || {}));
+
+  const allQuestions = useAllQuestions();
 
   const filtered = useMemo(() => {
-    return questions.filter(q => {
+    return allQuestions.filter(q => {
       if (filterDifficulty !== 'all' && q.difficulty !== filterDifficulty) return false;
       if (filterTopic !== 'all' && q.topic !== filterTopic) return false;
       if (filterImportance !== 'all' && q.importance !== filterImportance) return false;
       if (filterStatus === 'solved' && questionStatus[q.id] !== 'solved') return false;
       if (filterStatus === 'unsolved' && questionStatus[q.id] === 'solved') return false;
+      if (filterCompany !== 'all' && (!q.companies || !q.companies.includes(filterCompany))) return false;
       return true;
     });
-  }, [filterDifficulty, filterStatus, filterTopic, filterImportance, questionStatus]);
+  }, [allQuestions, filterDifficulty, filterStatus, filterTopic, filterImportance, filterCompany, questionStatus]);
 
   return (
     <div className="page-content animate-fade-in">
-      <div style={{ marginBottom: 'var(--space-5)' }}>
-        <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }}>📋 Complete Problem Sheet</h2>
-        <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
-          {questions.length} curated problems · Sorted by topic and pattern · Click any problem to open on LeetCode
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-5)' }}>
+        <div>
+          <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }}>📋 Complete Problem Sheet</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
+            {allQuestions.length} curated problems · Sorted by topic and pattern · Click any problem to open on LeetCode
+          </p>
+        </div>
+        <button className="btn btn-primary" onClick={() => setAddModalOpen(true)}>
+          + Add Problem
+        </button>
       </div>
 
       {/* Filters */}
-      <div className="filter-bar">
+      <div className="filter-bar" style={{ flexWrap: 'wrap', gap: 8 }}>
         <Filter size={16} style={{ color: 'var(--text-tertiary)' }} />
         <select className="filter-select" value={filterDifficulty} onChange={e => setFilterDifficulty(e.target.value)}>
           <option value="all">All Difficulty</option>
@@ -1009,12 +1136,21 @@ function SheetPage() {
           <option value="Recommended">⭐ Recommended</option>
           <option value="Good to Know">Good to Know</option>
         </select>
+        <select className="filter-select" value={filterCompany} onChange={e => setFilterCompany(e.target.value)}>
+          <option value="all">All Companies</option>
+          <option value="Google">Google</option>
+          <option value="Meta">Meta</option>
+          <option value="Amazon">Amazon</option>
+          <option value="Microsoft">Microsoft</option>
+        </select>
         <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>
-          Showing {filtered.length} of {questions.length}
+          Showing {filtered.length} of {allQuestions.length}
         </span>
       </div>
 
       <QuestionTable questionList={filtered} showTopic={true} showPattern={true} />
+
+      {addModalOpen && <AddCustomQuestionModal onClose={() => setAddModalOpen(false)} />}
     </div>
   );
 }
@@ -1023,7 +1159,10 @@ function SheetPage() {
 // PATTERNS LIST PAGE
 // ═══════════════════════════════════════════════════════════════
 function PatternsListPage() {
-  const questionStatus = useProgressStore(useShallow((s) => s.questionStatus));
+  const activeProfileId = useProgressStore((s) => s.activeProfileId);
+  const questionStatus = useProgressStore(useShallow((s) => s.profiles[activeProfileId]?.questionStatus || {}));
+  const allQuestions = useAllQuestions();
+
   const mainPatterns = [
     'hashing', 'two-pointers', 'sliding-window', 'binary-search', 'stack', 'monotonic-stack',
     'dfs', 'bfs', 'backtracking', 'dynamic-programming', 'greedy', 'topological-sort',
@@ -1042,7 +1181,7 @@ function PatternsListPage() {
         {mainPatterns.map(pid => {
           const pat = patterns[pid];
           if (!pat) return null;
-          const patQs = questions.filter(q => q.pattern === pid);
+          const patQs = allQuestions.filter(q => q.pattern === pid);
           const solved = patQs.filter(q => questionStatus[q.id] === 'solved').length;
           const pct = patQs.length ? Math.round((solved / patQs.length) * 100) : 0;
 
@@ -1084,7 +1223,8 @@ function PatternsListPage() {
 function PatternDetailPage() {
   const { patternId } = useParams();
   const pat = patterns[patternId];
-  const patQs = useMemo(() => questions.filter(q => q.pattern === patternId), [patternId]);
+  const allQuestions = useAllQuestions();
+  const patQs = useMemo(() => allQuestions.filter(q => q.pattern === patternId), [allQuestions, patternId]);
   const [showTheory, setShowTheory] = useState(true);
 
   if (!pat) {
@@ -1211,8 +1351,11 @@ function PatternDetailPage() {
 // REVISION PAGE
 // ═══════════════════════════════════════════════════════════════
 function RevisionPage() {
-  const revisions = useRevisionStore(useShallow((s) => s.revisions));
+  const activeProfileId = useProgressStore((s) => s.activeProfileId);
+  const revisions = useRevisionStore(useShallow((s) => s.profiles[activeProfileId] || {}));
   const completeRevision = useRevisionStore((s) => s.completeRevision);
+
+  const allQuestions = useAllQuestions();
 
   const { dueRevisions, upcomingRevisions } = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -1256,7 +1399,7 @@ function RevisionPage() {
         ) : (
           <div className="revision-queue">
             {dueRevisions.map(rev => {
-              const q = questions.find(qu => qu.id === rev.questionId);
+              const q = allQuestions.find(qu => qu.id === rev.questionId);
               if (!q) return null;
               return (
                 <div className="card revision-card" key={rev.questionId}>
@@ -1314,7 +1457,7 @@ function RevisionPage() {
               </thead>
               <tbody>
                 {upcomingRevisions.slice(0, 20).map(rev => {
-                  const q = questions.find(qu => qu.id === rev.questionId);
+                  const q = allQuestions.find(qu => qu.id === rev.questionId);
                   if (!q) return null;
                   return (
                     <tr key={rev.questionId}>
@@ -1343,11 +1486,14 @@ function RevisionPage() {
 // BOOKMARKS PAGE
 // ═══════════════════════════════════════════════════════════════
 function BookmarksPage() {
-  const bookmarks = useProgressStore(useShallow((s) => s.bookmarks));
+  const activeProfileId = useProgressStore((s) => s.activeProfileId);
+  const bookmarks = useProgressStore(useShallow((s) => s.profiles[activeProfileId]?.bookmarks || []));
+  const allQuestions = useAllQuestions();
+
   const bookmarkedQuestions = useMemo(() => {
     const bArr = bookmarks instanceof Set ? Array.from(bookmarks) : (Array.isArray(bookmarks) ? bookmarks : []);
-    return questions.filter(q => bArr.includes(q.id));
-  }, [bookmarks]);
+    return allQuestions.filter(q => bArr.includes(q.id));
+  }, [bookmarks, allQuestions]);
 
   return (
     <div className="page-content animate-fade-in">
@@ -1373,11 +1519,437 @@ function BookmarksPage() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// PROFILE MANAGER MODAL
+// ═══════════════════════════════════════════════════════════════
+function ProfileManagerModal({ onClose }) {
+  const profiles = useProgressStore(useShallow((s) => s.profiles));
+  const activeProfileId = useProgressStore((s) => s.activeProfileId);
+  const switchProfile = useProgressStore((s) => s.switchProfile);
+  const createProfile = useProgressStore((s) => s.createProfile);
+  const deleteProgressProfile = useProgressStore((s) => s.deleteProfile);
+  const deleteNotesProfile = useNotesStore((s) => s.deleteProfile);
+  const deleteRevisionProfile = useRevisionStore((s) => s.deleteProfile);
+
+  const [newName, setNewName] = useState('');
+  const [selectedAvatar, setSelectedAvatar] = useState('🦊');
+
+  const avatarOptions = ['🦊', '🐼', '🦁', '🐯', '🐸', '🐙', '🐵', '⚡', '🚀', '💻', '⭐', '🔥'];
+
+  const handleCreate = (e) => {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    const profileId = newName.trim().toLowerCase().replace(/\s+/g, '-');
+    if (profiles[profileId]) {
+      alert('A profile with this name already exists.');
+      return;
+    }
+    createProfile(profileId, newName.trim(), selectedAvatar);
+    setNewName('');
+  };
+
+  const handleDelete = (id) => {
+    if (Object.keys(profiles).length <= 1) {
+      alert('You must keep at least one profile.');
+      return;
+    }
+    if (confirm(`Are you sure you want to delete profile "${profiles[id].name}"? This action cannot be undone.`)) {
+      deleteProgressProfile(id);
+      deleteNotesProfile(id);
+      deleteRevisionProfile(id);
+    }
+  };
+
+  const handleExportBackup = () => {
+    const backup = {
+      progress: JSON.parse(useProgressStore.getState().exportData()),
+      notes: useNotesStore.getState().profiles,
+      revisions: useRevisionStore.getState().profiles,
+    };
+    
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dsa_master_backup_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportBackup = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const backup = JSON.parse(event.target.result);
+        if (backup && backup.progress && backup.notes && backup.revisions) {
+          // Hydrate progress store
+          useProgressStore.setState({
+            profiles: backup.progress.profiles,
+            activeProfileId: backup.progress.activeProfileId,
+          });
+          
+          // Hydrate notes store
+          useNotesStore.setState({
+            profiles: backup.notes,
+            activeProfileId: backup.progress.activeProfileId,
+          });
+          
+          // Hydrate revision store
+          useRevisionStore.setState({
+            profiles: backup.revisions,
+            activeProfileId: backup.progress.activeProfileId,
+          });
+          
+          alert('🎉 Backup imported successfully!');
+        } else {
+          alert('❌ Invalid backup file format.');
+        }
+      } catch (err) {
+        alert('❌ Failed to parse backup file.');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  return createPortal(
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 500 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-title">👤 Profile Management</div>
+          <button className="modal-close" onClick={onClose}><X size={18} /></button>
+        </div>
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* List existing */}
+          <div>
+            <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Existing Profiles</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {Object.entries(profiles).map(([id, p]) => {
+                const solvedCount = Object.values(p.questionStatus || {}).filter(s => s === 'solved').length;
+                return (
+                  <div key={id} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)',
+                    border: id === activeProfileId ? '1px solid var(--accent-primary)' : '1px solid var(--border-primary)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ fontSize: 20 }}>{p.avatar}</span>
+                      <div>
+                        <span style={{ fontWeight: 500, fontSize: 14 }}>{p.name}</span>
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{solvedCount} solved</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {id !== activeProfileId && (
+                        <button className="btn btn-ghost btn-sm" onClick={() => switchProfile(id)}>Switch</button>
+                      )}
+                      {Object.keys(profiles).length > 1 && (
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(id)}>Delete</button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Create new profile */}
+          <form onSubmit={handleCreate} style={{ borderTop: '1px solid var(--border-primary)', paddingTop: 12 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Create New Profile</h3>
+            <div className="notes-field" style={{ marginBottom: 8 }}>
+              <label>Name</label>
+              <input
+                type="text"
+                placeholder="Enter name..."
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                style={{
+                  width: '100%', padding: '8px 12px', background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)',
+                  color: 'var(--text-primary)', fontSize: 14,
+                }}
+                required
+              />
+            </div>
+            <div className="notes-field" style={{ marginBottom: 12 }}>
+              <label>Choose Avatar</label>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                {avatarOptions.map(emoji => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => setSelectedAvatar(emoji)}
+                    style={{
+                      fontSize: 20, width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: selectedAvatar === emoji ? 'var(--accent-glow)' : 'var(--bg-tertiary)',
+                      border: selectedAvatar === emoji ? '1px solid var(--accent-primary)' : '1px solid var(--border-primary)',
+                      borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                    }}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Add Profile</button>
+          </form>
+
+          {/* Backup / Restore */}
+          <div style={{ borderTop: '1px solid var(--border-primary)', paddingTop: 12 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Backup & Restore</h3>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={handleExportBackup}>
+                📥 Export Backup
+              </button>
+              <label className="btn btn-secondary" style={{ flex: 1, textAlign: 'center', cursor: 'pointer' }}>
+                📤 Import Backup
+                <input
+                  type="file"
+                  accept=".json"
+                  style={{ display: 'none' }}
+                  onChange={handleImportBackup}
+                />
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ADD CUSTOM QUESTION MODAL
+// ═══════════════════════════════════════════════════════════════
+function AddCustomQuestionModal({ onClose }) {
+  const addCustomQuestion = useProgressStore((s) => s.addCustomQuestion);
+  const [form, setForm] = useState({
+    title: '',
+    url: '',
+    difficulty: 'Easy',
+    topic: 'arrays',
+    pattern: 'basic-traversal',
+    importance: 'Must Do',
+    why: '',
+    companies: [],
+  });
+
+  const handleCompanyChange = (companyName) => {
+    setForm(prev => {
+      const current = prev.companies;
+      const next = current.includes(companyName)
+        ? current.filter(c => c !== companyName)
+        : [...current, companyName];
+      return { ...prev, companies: next };
+    });
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!form.title.trim()) return;
+
+    let finalUrl = form.url.trim();
+    if (!finalUrl) {
+      const slug = form.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      finalUrl = `https://leetcode.com/problems/${slug}/`;
+    }
+
+    addCustomQuestion({
+      title: form.title.trim(),
+      url: finalUrl,
+      difficulty: form.difficulty,
+      topic: form.topic,
+      pattern: form.pattern,
+      importance: form.importance,
+      why: form.why.trim() || 'Custom added problem.',
+      companies: form.companies,
+    });
+
+    onClose();
+  };
+
+  const sortedPatterns = useMemo(() => {
+    return Object.entries(patterns)
+      .map(([id, p]) => ({ id, name: p.name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, []);
+
+  return createPortal(
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 500 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-title">➕ Add Custom Problem</div>
+          <button className="modal-close" onClick={onClose}><X size={18} /></button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="notes-field">
+              <label>Problem Title *</label>
+              <input
+                type="text"
+                placeholder="e.g., Two Sum"
+                value={form.title}
+                onChange={e => setForm({ ...form, title: e.target.value })}
+                required
+                style={{
+                  width: '100%', padding: '8px 12px', background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)',
+                  color: 'var(--text-primary)', fontSize: 14,
+                }}
+              />
+            </div>
+            
+            <div className="notes-field">
+              <label>LeetCode URL (Optional)</label>
+              <input
+                type="url"
+                placeholder="e.g., https://leetcode.com/problems/two-sum/"
+                value={form.url}
+                onChange={e => setForm({ ...form, url: e.target.value })}
+                style={{
+                  width: '100%', padding: '8px 12px', background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)',
+                  color: 'var(--text-primary)', fontSize: 14,
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="notes-field">
+                <label>Difficulty</label>
+                <select
+                  value={form.difficulty}
+                  onChange={e => setForm({ ...form, difficulty: e.target.value })}
+                  style={{
+                    width: '100%', padding: '8px 12px', background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)',
+                    color: 'var(--text-primary)', fontSize: 14,
+                  }}
+                >
+                  <option value="Easy">Easy</option>
+                  <option value="Medium">Medium</option>
+                  <option value="Hard">Hard</option>
+                </select>
+              </div>
+
+              <div className="notes-field">
+                <label>Importance</label>
+                <select
+                  value={form.importance}
+                  onChange={e => setForm({ ...form, importance: e.target.value })}
+                  style={{
+                    width: '100%', padding: '8px 12px', background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)',
+                    color: 'var(--text-primary)', fontSize: 14,
+                  }}
+                >
+                  <option value="Must Do">🔥 Must Do</option>
+                  <option value="Recommended">⭐ Recommended</option>
+                  <option value="Good to Know">Good to Know</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="notes-field">
+                <label>Topic</label>
+                <select
+                  value={form.topic}
+                  onChange={e => setForm({ ...form, topic: e.target.value })}
+                  style={{
+                    width: '100%', padding: '8px 12px', background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)',
+                    color: 'var(--text-primary)', fontSize: 14,
+                  }}
+                >
+                  {topics.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="notes-field">
+                <label>Pattern</label>
+                <select
+                  value={form.pattern}
+                  onChange={e => setForm({ ...form, pattern: e.target.value })}
+                  style={{
+                    width: '100%', padding: '8px 12px', background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)',
+                    color: 'var(--text-primary)', fontSize: 14,
+                  }}
+                >
+                  {sortedPatterns.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="notes-field">
+              <label>Companies</label>
+              <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
+                {['Google', 'Meta', 'Amazon', 'Microsoft'].map(c => (
+                  <label key={c} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={form.companies.includes(c)}
+                      onChange={() => handleCompanyChange(c)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    {c}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="notes-field">
+              <label>Why solve / Key intuition</label>
+              <textarea
+                placeholder="What makes this problem special?"
+                value={form.why}
+                onChange={e => setForm({ ...form, why: e.target.value })}
+                rows={2}
+                style={{
+                  width: '100%', padding: '8px 12px', background: 'var(--bg-tertiary)',
+                  border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)',
+                  color: 'var(--text-primary)', fontSize: 14,
+                }}
+              />
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary">Add Problem</button>
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // APP LAYOUT + ROUTING
 // ═══════════════════════════════════════════════════════════════
 function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [managerOpen, setManagerOpen] = useState(false);
   const location = useLocation();
+
+  const activeProfileId = useProgressStore((s) => s.activeProfileId);
+  const switchNotesProfile = useNotesStore((s) => s.switchProfile);
+  const switchRevisionProfile = useRevisionStore((s) => s.switchProfile);
+
+  // Keep notes and revisions store profiles in sync with the active progress profile
+  useEffect(() => {
+    switchNotesProfile(activeProfileId);
+    switchRevisionProfile(activeProfileId);
+  }, [activeProfileId, switchNotesProfile, switchRevisionProfile]);
 
   const getPageTitle = () => {
     if (location.pathname === '/') return 'Dashboard';
@@ -1398,7 +1970,11 @@ function AppLayout() {
     <div className="app-layout">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="main-content">
-        <Header title={getPageTitle()} onMenuClick={() => setSidebarOpen(true)} />
+        <Header
+          title={getPageTitle()}
+          onMenuClick={() => setSidebarOpen(true)}
+          onManageProfiles={() => setManagerOpen(true)}
+        />
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/topics" element={<TopicsPage />} />
@@ -1410,6 +1986,7 @@ function AppLayout() {
           <Route path="/bookmarks" element={<BookmarksPage />} />
         </Routes>
       </div>
+      {managerOpen && <ProfileManagerModal onClose={() => setManagerOpen(false)} />}
     </div>
   );
 }

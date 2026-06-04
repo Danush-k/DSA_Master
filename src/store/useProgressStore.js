@@ -1,27 +1,80 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+const DEFAULT_PROFILE_STATE = {
+  questionStatus: {},
+  dailySolves: {},
+  bookmarks: [],
+  currentStreak: 0,
+  longestStreak: 0,
+  lastSolveDate: null,
+  customQuestions: [],
+};
+
 const useProgressStore = create(
   persist(
     (set, get) => ({
-      // Question status: { [questionId]: 'solved' | 'attempted' | 'revisit' }
-      questionStatus: {},
-      // Daily solve counts: { 'YYYY-MM-DD': count }
-      dailySolves: {},
-      // Bookmarks as array of ids
-      bookmarks: [],
-      // Streak
-      currentStreak: 0,
-      longestStreak: 0,
-      lastSolveDate: null,
+      activeProfileId: 'default',
+      profiles: {
+        'default': {
+          name: 'Default Profile',
+          avatar: '⚡',
+          ...DEFAULT_PROFILE_STATE
+        }
+      },
+
+      // Profile Actions
+      switchProfile: (profileId) => {
+        set((state) => {
+          if (!state.profiles[profileId]) {
+            return state;
+          }
+          return { activeProfileId: profileId };
+        });
+      },
+
+      createProfile: (profileId, name, avatar) => {
+        set((state) => ({
+          profiles: {
+            ...state.profiles,
+            [profileId]: {
+              name,
+              avatar: avatar || '⚡',
+              ...DEFAULT_PROFILE_STATE
+            }
+          }
+        }));
+      },
+
+      deleteProfile: (profileId) => {
+        set((state) => {
+          const profileIds = Object.keys(state.profiles);
+          if (profileIds.length <= 1) return state;
+
+          const newProfiles = { ...state.profiles };
+          delete newProfiles[profileId];
+
+          let nextActive = state.activeProfileId;
+          if (state.activeProfileId === profileId) {
+            nextActive = Object.keys(newProfiles)[0];
+          }
+
+          return {
+            profiles: newProfiles,
+            activeProfileId: nextActive
+          };
+        });
+      },
 
       // Toggle question status
       toggleStatus: (questionId, status) => {
         set((state) => {
-          const current = state.questionStatus[questionId];
-          const newStatus = { ...state.questionStatus };
+          const profileId = state.activeProfileId;
+          const profile = state.profiles[profileId] || { ...DEFAULT_PROFILE_STATE };
+          const current = profile.questionStatus[questionId];
+          const newStatus = { ...profile.questionStatus };
           const today = new Date().toISOString().split('T')[0];
-          const newDailySolves = { ...state.dailySolves };
+          const newDailySolves = { ...profile.dailySolves };
 
           if (current === status) {
             delete newStatus[questionId];
@@ -40,7 +93,7 @@ const useProgressStore = create(
             newStatus[questionId] = status;
           }
 
-          let { currentStreak, longestStreak, lastSolveDate } = state;
+          let { currentStreak, longestStreak, lastSolveDate } = profile;
           if (status === 'solved' && current !== status) {
             const yesterday = new Date();
             yesterday.setDate(yesterday.getDate() - 1);
@@ -56,11 +109,17 @@ const useProgressStore = create(
           }
 
           return {
-            questionStatus: newStatus,
-            dailySolves: newDailySolves,
-            currentStreak,
-            longestStreak,
-            lastSolveDate,
+            profiles: {
+              ...state.profiles,
+              [profileId]: {
+                ...profile,
+                questionStatus: newStatus,
+                dailySolves: newDailySolves,
+                currentStreak,
+                longestStreak,
+                lastSolveDate,
+              }
+            }
           };
         });
       },
@@ -68,52 +127,102 @@ const useProgressStore = create(
       // Toggle bookmark
       toggleBookmark: (questionId) => {
         set((state) => {
-          const bookmarks = [...state.bookmarks];
+          const profileId = state.activeProfileId;
+          const profile = state.profiles[profileId] || { ...DEFAULT_PROFILE_STATE };
+          const bookmarks = [...(profile.bookmarks || [])];
           const idx = bookmarks.indexOf(questionId);
           if (idx >= 0) {
             bookmarks.splice(idx, 1);
           } else {
             bookmarks.push(questionId);
           }
-          return { bookmarks };
+          return {
+            profiles: {
+              ...state.profiles,
+              [profileId]: {
+                ...profile,
+                bookmarks
+              }
+            }
+          };
         });
       },
 
-      // Export
+      // Add Custom Question
+      addCustomQuestion: (questionData) => {
+        set((state) => {
+          const profileId = state.activeProfileId;
+          const profile = state.profiles[profileId] || { ...DEFAULT_PROFILE_STATE };
+          const customQuestions = [...(profile.customQuestions || [])];
+          
+          // Generate unique custom ID starting at 10000
+          const newId = 10000 + customQuestions.length + 1;
+          const newQuestion = {
+            id: newId,
+            num: `C${customQuestions.length + 1}`,
+            isCustom: true,
+            importance: 'Good to Know',
+            companies: [],
+            ...questionData
+          };
+
+          customQuestions.push(newQuestion);
+          return {
+            profiles: {
+              ...state.profiles,
+              [profileId]: {
+                ...profile,
+                customQuestions
+              }
+            }
+          };
+        });
+      },
+
+      // Export/Import
       exportData: () => {
         const state = get();
         return JSON.stringify({
-          questionStatus: state.questionStatus,
-          dailySolves: state.dailySolves,
-          bookmarks: state.bookmarks,
-          currentStreak: state.currentStreak,
-          longestStreak: state.longestStreak,
-          lastSolveDate: state.lastSolveDate,
+          profiles: state.profiles,
+          activeProfileId: state.activeProfileId,
         });
       },
 
       importData: (jsonString) => {
         try {
           const data = JSON.parse(jsonString);
-          set(data);
-          return true;
+          if (data && data.profiles && data.activeProfileId) {
+            set({
+              profiles: data.profiles,
+              activeProfileId: data.activeProfileId
+            });
+            return true;
+          }
+          return false;
         } catch {
           return false;
         }
       },
 
       resetProgress: () => {
-        set({
-          questionStatus: {},
-          dailySolves: {},
-          bookmarks: [],
-          currentStreak: 0,
-          longestStreak: 0,
-          lastSolveDate: null,
+        set((state) => {
+          const profileId = state.activeProfileId;
+          const profile = state.profiles[profileId];
+          if (!profile) return state;
+
+          return {
+            profiles: {
+              ...state.profiles,
+              [profileId]: {
+                ...profile,
+                ...DEFAULT_PROFILE_STATE
+              }
+            }
+          };
         });
       },
     }),
-    { name: 'dsa-progress' }
+    { name: 'dsa-progress-v2' }
   )
 );
 
