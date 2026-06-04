@@ -5,7 +5,9 @@ import { useShallow } from 'zustand/react/shallow';
 import {
   LayoutDashboard, BookOpen, Target, ListChecks, RotateCcw, Bookmark,
   Search, Moon, Sun, ChevronRight, Check, ExternalLink, StickyNote,
-  Menu, X, Filter, Clock, Flame, Calendar, ChevronDown, ChevronUp, BarChart3, Info
+  Menu, X, Filter, Clock, Flame, Calendar, ChevronDown, ChevronUp, BarChart3, Info,
+  ArrowUpDown, Binary, ChevronsLeftRight, Columns, GitBranch, Grid, Hash, Layers,
+  Link as LinkIcon, Network, Sparkles, Star, TrendingUp, Type, Zap
 } from 'lucide-react';
 
 // Custom Youtube SVG Icon since brand icons are not exported in this lucide-react version
@@ -20,6 +22,84 @@ const Youtube = ({ size = 24, fill = "currentColor", ...props }) => (
     <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.518 3.545 12 3.545 12 3.545s-7.518 0-9.388.508a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11c1.87.508 9.388.508 9.388.508s7.518 0 9.388-.508a3.003 3.003 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
   </svg>
 );
+
+// Mapping topic IDs to professional LeetCode-style icons
+function getTopicIcon(topicId, props = {}) {
+  const map = {
+    "arrays": Binary,
+    "sorting": ArrowUpDown,
+    "strings": Type,
+    "hashing": Hash,
+    "two-pointers": ChevronsLeftRight,
+    "sliding-window": Columns,
+    "binary-search": Search,
+    "linked-lists": LinkIcon,
+    "stacks-queues": Layers,
+    "trees": Network,
+    "heap": TrendingUp,
+    "backtracking": RotateCcw,
+    "greedy": Zap,
+    "graphs": Network,
+    "dynamic-programming": Grid,
+    "trie": GitBranch,
+    "bit-manipulation": Binary,
+    "segment-tree": Network,
+    "advanced": Sparkles,
+  };
+  const IconComponent = map[topicId] || BookOpen;
+  return <IconComponent {...props} />;
+}
+
+// Mapping pattern IDs to professional LeetCode-style icons
+function getPatternIcon(patternId, props = {}) {
+  const map = {
+    "hashing": Hash,
+    "two-pointers": ChevronsLeftRight,
+    "sliding-window": Columns,
+    "binary-search": Search,
+    "stack": Layers,
+    "monotonic-stack": Layers,
+    "dfs": GitBranch,
+    "bfs": GitBranch,
+    "backtracking": RotateCcw,
+    "dynamic-programming": Grid,
+    "topological-sort": ArrowUpDown,
+    "union-find": LinkIcon,
+    "shortest-path": GitBranch,
+    "heap": TrendingUp,
+    "greedy": Zap,
+    "trie": GitBranch,
+    "bit-manipulation": Binary,
+    "basic-traversal": Binary,
+    "prefix-sum": Binary,
+    "reversal": RotateCcw,
+    "fast-slow-pointer": ChevronsLeftRight,
+    "merge": LinkIcon,
+    "traversal": Binary,
+    "bst": Network,
+    "tree-construction": Network,
+    "mst": Network,
+    "1d-dp": Grid,
+    "grid-dp": Grid,
+    "knapsack": Grid,
+    "lis": Grid,
+    "lcs": Grid,
+    "interval-dp": Grid,
+    "bitmask-dp": Grid,
+    "dp-on-trees": Grid,
+    "segment-tree": Network,
+    "string-matching": Type,
+    "math": Binary,
+    "sorting-basics": ArrowUpDown,
+    "merge-sort": ArrowUpDown,
+    "quick-select": ArrowUpDown,
+    "bucket-sort": ArrowUpDown,
+    "counting-sort": ArrowUpDown,
+    "custom-comparator": ArrowUpDown,
+  };
+  const IconComponent = map[patternId] || Target;
+  return <IconComponent {...props} />;
+}
 import questions from './data/questions.js';
 import topics from './data/topics.js';
 import patterns from './data/patterns.js';
@@ -472,12 +552,19 @@ function QuestionRow({ q, showTopic = false, showPattern = true }) {
           </td>
         )}
         <td>
-          <span style={{
-            fontSize: 11, fontWeight: 600,
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            fontSize: 11,
+            fontWeight: 600,
             color: q.importance === 'Must Do' ? 'var(--error)' : q.importance === 'Recommended' ? 'var(--warning)' : 'var(--text-tertiary)',
           }}>
-            {q.importance === 'Must Do' ? '🔥' : q.importance === 'Recommended' ? '⭐' : '·'} {q.importance}
-          </span>
+            {q.importance === 'Must Do' && <Flame size={12} fill="currentColor" />}
+            {q.importance === 'Recommended' && <Star size={12} fill="currentColor" />}
+            {q.importance === 'Good to Know' && <span style={{ marginRight: 2 }}>·</span>}
+            <span>{q.importance}</span>
+          </div>
         </td>
         <td>
           <div className="question-actions">
@@ -945,7 +1032,9 @@ function DashboardPage() {
               return (
                 <Link to={`/topics/${topic.id}`} key={topic.id} style={{ textDecoration: 'none', color: 'inherit' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ fontSize: 18, width: 28, textAlign: 'center' }}>{topic.icon}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, color: topic.color }}>
+                      {getTopicIcon(topic.id, { size: 18 })}
+                    </span>
                     <span style={{ fontSize: 14, fontWeight: 500, width: 160, flexShrink: 0 }}>{topic.name}</span>
                     <div className="progress-bar" style={{ flex: 1 }}>
                       <div className="progress-bar-fill" style={{ width: `${pct}%`, background: topic.color }} />
@@ -992,7 +1081,7 @@ function TopicsPage() {
               <div className="card card-interactive topic-card">
                 <div className="topic-card-header">
                   <div className="topic-card-icon" style={{ background: `${topic.color}20`, color: topic.color }}>
-                    {topic.icon}
+                    {getTopicIcon(topic.id, { size: 24 })}
                   </div>
                   <div>
                     <div className="topic-card-title">{topic.name}</div>
@@ -1081,9 +1170,9 @@ function TopicDetailPage() {
           <div style={{
             width: 56, height: 56, borderRadius: 'var(--radius-lg)',
             background: `${topic.color}20`, color: topic.color,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            {topic.icon}
+            {getTopicIcon(topic.id, { size: 28 })}
           </div>
           <div>
             <h2 className="topic-detail-title">{topic.name}</h2>
@@ -1130,7 +1219,9 @@ function TopicDetailPage() {
           <div className="pattern-group" key={patternId}>
             <div className="pattern-group-header">
               <div className="pattern-group-title">
-                <span>{pat?.icon || '📌'}</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-primary)' }}>
+                  {getPatternIcon(patternId, { size: 18 })}
+                </span>
                 <span>{pat?.name || patternId}</span>
                 <span className="pattern-group-count">{patSolved}/{qs.length}</span>
               </div>
@@ -1268,9 +1359,9 @@ function PatternsListPage() {
               <div className="card card-interactive topic-card">
                 <div className="topic-card-header">
                   <div className="topic-card-icon" style={{
-                    background: 'var(--accent-glow)', color: 'var(--accent-primary)', fontSize: 20,
+                    background: 'var(--accent-glow)', color: 'var(--accent-primary)',
                   }}>
-                    {pat.icon}
+                    {getPatternIcon(pid, { size: 24 })}
                   </div>
                   <div>
                     <div className="topic-card-title">{pat.name}</div>
@@ -1325,7 +1416,9 @@ function PatternDetailPage() {
       {/* Pattern Hero */}
       <div className="pattern-hero">
         <div style={{ position: 'relative', zIndex: 1 }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>{pat.icon}</div>
+          <div style={{ color: 'var(--accent-primary)', marginBottom: 12 }}>
+            {getPatternIcon(patternId, { size: 36 })}
+          </div>
           <h2 className="pattern-hero-title">{pat.name}</h2>
           <p className="pattern-hero-description">{pat.description}</p>
 
