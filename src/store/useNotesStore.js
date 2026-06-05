@@ -85,6 +85,15 @@ const useNotesStore = create(
         if (!note) return false;
         return Object.values(note).some(v => v && v !== '' && v !== note.updatedAt);
       },
+
+      clearStore: () => {
+        set({
+          activeProfileId: 'default',
+          profiles: {
+            'default': {}
+          }
+        });
+      },
     }),
     { name: 'dsa-notes-v2' }
   )

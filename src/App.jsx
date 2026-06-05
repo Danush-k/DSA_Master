@@ -11,8 +11,17 @@ import {
   Cloud, CloudOff, RefreshCw, User, Map
 } from 'lucide-react';
 import { auth } from './firebaseClient.js';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup, deleteUser } from 'firebase/auth';
-import { initDbSync, deleteUserCloudData } from './services/dbSync.js';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  GoogleAuthProvider,
+  signInWithPopup,
+  deleteUser,
+  sendPasswordResetEmail,
+  sendEmailVerification
+} from 'firebase/auth';
+import { initDbSync, deleteUserCloudData, clearAllLocalStores } from './services/dbSync.js';
 
 // Custom Youtube SVG Icon since brand icons are not exported in this lucide-react version
 const Youtube = ({ size = 24, fill = "currentColor", ...props }) => (
@@ -2217,7 +2226,7 @@ function AppLayout() {
   const switchNotesProfile = useNotesStore((s) => s.switchProfile);
   const switchRevisionProfile = useRevisionStore((s) => s.switchProfile);
 
-  const [syncStatus, setSyncStatus] = useState('local'); // 'local-only', 'local', 'syncing', 'synced'
+  const [syncStatus, setSyncStatus] = useState('loading'); // 'loading', 'unauthenticated', 'syncing', 'synced'
   const [user, setUser] = useState(null);
 
   // Initialize DB Sync
@@ -2266,19 +2275,79 @@ function AppLayout() {
     if (location.pathname === '/bookmarks') return 'Bookmarks';
     if (location.pathname === '/login') return 'Account Login';
     if (location.pathname === '/profile') return 'User Profile';
+    if (location.pathname === '/verify-email') return 'Email Verification';
     return 'Danush';
   };
 
   const handleAuthClick = () => {
-    if (syncStatus !== 'local-only') {
-      if (user) {
-        navigate('/profile');
-      } else {
-        navigate('/login');
-      }
+    if (user) {
+      navigate('/profile');
+    } else {
+      navigate('/login');
     }
   };
 
+  // Auth Guarding Routing Rules
+  const isAuthenticated = user !== null;
+  const isEmailVerified = user ? (user.emailVerified || user.providerData.some(p => p.providerId === 'google.com')) : false;
+
+  useEffect(() => {
+    if (syncStatus !== 'loading') {
+      if (!isAuthenticated) {
+        if (location.pathname !== '/login') {
+          navigate('/login');
+        }
+      } else if (!isEmailVerified) {
+        if (location.pathname !== '/verify-email') {
+          navigate('/verify-email');
+        }
+      } else {
+        if (location.pathname === '/login' || location.pathname === '/verify-email') {
+          navigate('/');
+        }
+      }
+    }
+  }, [syncStatus, isAuthenticated, isEmailVerified, location.pathname, navigate]);
+
+  // Loading Screen
+  if (syncStatus === 'loading') {
+    return (
+      <div className="lc-loading-screen">
+        <div className="lc-loading-card">
+          <div className="lc-logo-circle spin-glow">⚡</div>
+          <h2 className="lc-loading-title">DSA Mastery</h2>
+          <div className="lc-loading-subtitle">Loading your workspace...</div>
+          <div className="lc-spinner"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Gated View: Unauthenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="app-layout auth-only">
+        <Routes>
+          <Route path="/login" element={<LoginPage user={user} />} />
+          <Route path="*" element={<LoginPage user={user} />} />
+        </Routes>
+      </div>
+    );
+  }
+
+  // Gated View: Email Verification Needed
+  if (!isEmailVerified) {
+    return (
+      <div className="app-layout auth-only">
+        <Routes>
+          <Route path="/verify-email" element={<VerifyEmailPage user={user} />} />
+          <Route path="*" element={<VerifyEmailPage user={user} />} />
+        </Routes>
+      </div>
+    );
+  }
+
+  // Main Authenticated Workspace
   return (
     <div className="app-layout">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -2301,8 +2370,8 @@ function AppLayout() {
           <Route path="/patterns/:patternId" element={<PatternDetailPage />} />
           <Route path="/revision" element={<RevisionPage />} />
           <Route path="/bookmarks" element={<BookmarksPage />} />
-          <Route path="/login" element={<LoginPage user={user} />} />
           <Route path="/profile" element={<ProfilePage user={user} syncStatus={syncStatus} />} />
+          <Route path="*" element={<DashboardPage />} />
         </Routes>
       </div>
       {managerOpen && <ProfileManagerModal onClose={() => setManagerOpen(false)} />}
@@ -2773,37 +2842,49 @@ function RoadmapPage() {
 // ═══════════════════════════════════════════════════════════════
 function LoginPage({ user }) {
   const navigate = useNavigate();
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [mode, setMode] = useState('signin'); // 'signin', 'signup', 'forgot'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
-      navigate('/profile');
+      const isEmailVerified = user.emailVerified || user.providerData.some(p => p.providerId === 'google.com');
+      if (isEmailVerified) {
+        navigate('/');
+      } else {
+        navigate('/verify-email');
+      }
     }
   }, [user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email.trim() || !password.trim()) return;
     setError('');
-    setLoading(true);
+    setSuccess('');
+    if (!email.trim()) return;
+    if (mode !== 'forgot' && !password.trim()) return;
 
+    setLoading(true);
     try {
-      if (isSignUp) {
-        await createUserWithEmailAndPassword(auth, email.trim(), password.trim());
-      } else {
+      if (mode === 'signup') {
+        const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password.trim());
+        await sendEmailVerification(userCredential.user);
+      } else if (mode === 'signin') {
         await signInWithEmailAndPassword(auth, email.trim(), password.trim());
+      } else if (mode === 'forgot') {
+        await sendPasswordResetEmail(auth, email.trim());
+        setSuccess('Password reset link has been sent to your email.');
       }
-      navigate('/');
     } catch (err) {
       console.error(err);
       let errMsg = err.message;
       if (err.code === 'auth/wrong-password') errMsg = 'Incorrect password.';
       if (err.code === 'auth/user-not-found') errMsg = 'User not found.';
       if (err.code === 'auth/email-already-in-use') errMsg = 'Email already in use.';
+      if (err.code === 'auth/invalid-credential') errMsg = 'Invalid login credentials.';
       setError(errMsg);
     } finally {
       setLoading(false);
@@ -2812,11 +2893,11 @@ function LoginPage({ user }) {
 
   const handleGoogleSignIn = async () => {
     setError('');
+    setSuccess('');
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-      navigate('/');
     } catch (err) {
       console.error(err);
       let errMsg = err.message;
@@ -2832,25 +2913,33 @@ function LoginPage({ user }) {
       <div className="lc-login-card">
         <div className="lc-login-header">
           <div className="lc-logo-circle">⚡</div>
-          <h2 className="lc-login-title">DSA Mastery</h2>
+          <h2 className="lc-login-title">
+            {mode === 'forgot' ? 'Reset Password' : 'DSA Mastery'}
+          </h2>
         </div>
 
-        <div className="lc-tab-container">
-          <button
-            type="button"
-            className={`lc-tab-btn ${!isSignUp ? 'active' : ''}`}
-            onClick={() => { setIsSignUp(false); setError(''); }}
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            className={`lc-tab-btn ${isSignUp ? 'active' : ''}`}
-            onClick={() => { setIsSignUp(true); setError(''); }}
-          >
-            Register
-          </button>
-        </div>
+        {mode !== 'forgot' ? (
+          <div className="lc-tab-container">
+            <button
+              type="button"
+              className={`lc-tab-btn ${mode === 'signin' ? 'active' : ''}`}
+              onClick={() => { setMode('signin'); setError(''); setSuccess(''); }}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              className={`lc-tab-btn ${mode === 'signup' ? 'active' : ''}`}
+              onClick={() => { setMode('signup'); setError(''); setSuccess(''); }}
+            >
+              Register
+            </button>
+          </div>
+        ) : (
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', margin: '4px 0', lineHeight: 1.5 }}>
+            Enter your email address and we will send you a link to reset your password.
+          </p>
+        )}
 
         {error && (
           <div style={{
@@ -2859,6 +2948,16 @@ function LoginPage({ user }) {
             color: 'var(--error)', fontSize: 13, lineHeight: 1.4, textAlign: 'center'
           }}>
             ⚠️ {error}
+          </div>
+        )}
+
+        {success && (
+          <div style={{
+            padding: '10px 12px', background: 'rgba(0, 184, 163, 0.1)',
+            border: '1px solid rgba(0, 184, 163, 0.2)', borderRadius: 'var(--radius-md)',
+            color: 'var(--success)', fontSize: 13, lineHeight: 1.4, textAlign: 'center'
+          }}>
+            🟢 {success}
           </div>
         )}
 
@@ -2875,48 +2974,203 @@ function LoginPage({ user }) {
             />
           </div>
 
-          <div className="lc-input-group">
-            <label>Password</label>
-            <input
-              type="password"
-              placeholder="Min 6 characters"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required={!loading}
-              className="lc-input"
-            />
-          </div>
+          {mode !== 'forgot' && (
+            <div className="lc-input-group">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label>Password</label>
+                {mode === 'signin' && (
+                  <button
+                    type="button"
+                    onClick={() => { setMode('forgot'); setError(''); setSuccess(''); }}
+                    style={{ background: 'none', border: 'none', color: '#ffa116', fontSize: 11, cursor: 'pointer', padding: 0 }}
+                  >
+                    Forgot Password?
+                  </button>
+                )}
+              </div>
+              <input
+                type="password"
+                placeholder="Min 6 characters"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required={!loading}
+                className="lc-input"
+              />
+            </div>
+          )}
 
           <button type="submit" className="lc-submit-btn" disabled={loading}>
-            {loading ? 'Processing...' : isSignUp ? 'Sign Up' : 'Sign In'}
+            {loading ? 'Processing...' : mode === 'signin' ? 'Sign In' : mode === 'signup' ? 'Sign Up' : 'Send Recovery Email'}
           </button>
         </form>
 
-        <div className="lc-divider">
-          <span>or connect with</span>
-        </div>
+        {mode === 'forgot' && (
+          <div style={{ textAlign: 'center', marginTop: 4 }}>
+            <button
+              type="button"
+              onClick={() => { setMode('signin'); setError(''); setSuccess(''); }}
+              style={{ background: 'none', border: 'none', color: '#ffa116', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}
+            >
+              Back to Sign In
+            </button>
+          </div>
+        )}
 
-        <button type="button" className="lc-google-btn" onClick={handleGoogleSignIn} disabled={loading}>
-          <svg viewBox="0 0 24 24" width="18" height="18" style={{ minWidth: 18 }}>
-            <path
-              fill="#4285F4"
-              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-            />
-            <path
-              fill="#34A853"
-              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-            />
-            <path
-              fill="#FBBC05"
-              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-            />
-            <path
-              fill="#EA4335"
-              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-            />
-          </svg>
-          Continue with Google
-        </button>
+        {mode !== 'forgot' && (
+          <>
+            <div className="lc-divider">
+              <span>or connect with</span>
+            </div>
+
+            <button type="button" className="lc-google-btn" onClick={handleGoogleSignIn} disabled={loading}>
+              <svg viewBox="0 0 24 24" width="18" height="18" style={{ minWidth: 18 }}>
+                <path
+                  fill="#4285F4"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                />
+              </svg>
+              Continue with Google
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EMAIL VERIFICATION PAGE
+// ═══════════════════════════════════════════════════════════════
+function VerifyEmailPage({ user }) {
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+
+  // Send verification email
+  const handleResend = async () => {
+    if (cooldown > 0) return;
+    setError('');
+    setMessage('');
+    setLoading(true);
+    try {
+      if (auth.currentUser) {
+        await sendEmailVerification(auth.currentUser);
+        setMessage('A verification email has been sent to ' + auth.currentUser.email);
+        setCooldown(60);
+      } else {
+        setError('No active session found. Please sign in again.');
+      }
+    } catch (err) {
+      console.error(err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Check verification status (refresh user token/profile)
+  const handleRefresh = async () => {
+    setError('');
+    setMessage('');
+    setLoading(true);
+    try {
+      if (auth.currentUser) {
+        await auth.currentUser.reload();
+        window.location.reload();
+      } else {
+        setError('No active session found. Please sign in again.');
+      }
+    } catch (err) {
+      console.error(err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      clearAllLocalStores();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldown]);
+
+  return (
+    <div className="lc-login-container">
+      <div className="lc-login-card" style={{ textAlign: 'center' }}>
+        <div className="lc-login-header">
+          <div className="lc-logo-circle" style={{ border: '2px solid var(--accent-primary)' }}>✉️</div>
+          <h2 className="lc-login-title">Verify Your Email</h2>
+        </div>
+        
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+          We sent a verification link to <strong>{user?.email}</strong>. Please check your inbox (and spam folder) and verify your account.
+        </p>
+
+        {error && (
+          <div style={{
+            padding: '10px 12px', background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 'var(--radius-md)',
+            color: 'var(--error)', fontSize: 13, lineHeight: 1.4, textAlign: 'center'
+          }}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        {message && (
+          <div style={{
+            padding: '10px 12px', background: 'rgba(0, 184, 163, 0.1)',
+            border: '1px solid rgba(0, 184, 163, 0.2)', borderRadius: 'var(--radius-md)',
+            color: 'var(--success)', fontSize: 13, lineHeight: 1.4, textAlign: 'center'
+          }}>
+            🟢 {message}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
+          <button className="lc-submit-btn" onClick={handleRefresh} disabled={loading}>
+            {loading ? 'Checking...' : 'I have verified my email'}
+          </button>
+          
+          <button 
+            className="lc-google-btn" 
+            onClick={handleResend} 
+            disabled={loading || cooldown > 0}
+            style={{ border: '1px solid var(--border-secondary)', background: 'var(--bg-tertiary)' }}
+          >
+            {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend Verification Email'}
+          </button>
+          
+          <button 
+            className="lc-google-btn" 
+            onClick={handleLogout}
+            style={{ border: '1px solid var(--border-secondary)', background: 'var(--bg-tertiary)' }}
+          >
+            Sign Out / Different Account
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -3007,6 +3261,7 @@ function ProfilePage({ user, syncStatus }) {
   const handleLogout = async () => {
     try {
       await signOut(auth);
+      clearAllLocalStores();
       navigate('/');
     } catch (err) {
       console.error(err);
@@ -3037,34 +3292,8 @@ function ProfilePage({ user, syncStatus }) {
       // 2. Delete auth user account
       await deleteUser(currentUser);
       
-      // 3. Clear Zustand local stores back to default
-      useProgressStore.setState({
-        profiles: {
-          'default': {
-            name: 'Danush',
-            avatar: '🦊',
-            questionStatus: {},
-            dailySolves: {},
-            bookmarks: [],
-            currentStreak: 0,
-            longestStreak: 0,
-            lastSolveDate: null,
-            customQuestions: [],
-            solveHistory: []
-          }
-        },
-        activeProfileId: 'default'
-      });
-      
-      useNotesStore.setState({
-        profiles: { 'default': {} },
-        activeProfileId: 'default'
-      });
-      
-      useRevisionStore.setState({
-        profiles: { 'default': {} },
-        activeProfileId: 'default'
-      });
+      // 3. Clear local stores
+      clearAllLocalStores();
 
       alert("Your account and all associated data have been permanently deleted.");
       navigate('/');

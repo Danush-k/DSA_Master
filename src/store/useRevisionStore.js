@@ -161,6 +161,15 @@ const useRevisionStore = create(
           };
         });
       },
+
+      clearStore: () => {
+        set({
+          activeProfileId: 'default',
+          profiles: {
+            'default': {}
+          }
+        });
+      },
     }),
     { name: 'dsa-revisions-v2' }
   )

@@ -230,6 +230,19 @@ const useProgressStore = create(
           };
         });
       },
+
+      clearStore: () => {
+        set({
+          activeProfileId: 'default',
+          profiles: {
+            'default': {
+              name: 'Danush',
+              avatar: '🦊',
+              ...DEFAULT_PROFILE_STATE
+            }
+          }
+        });
+      },
     }),
     { name: 'dsa-progress-v2' }
   )

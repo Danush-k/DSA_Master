@@ -23,6 +23,9 @@ export function initDbSync(onStatusChange) {
     return;
   }
 
+  // Notify loading state immediately
+  if (onStatusChange) onStatusChange('loading', null);
+
   // Listen for Firebase Authentication state changes
   onAuthStateChanged(auth, async (user) => {
     if (user) {
@@ -32,7 +35,7 @@ export function initDbSync(onStatusChange) {
       if (onStatusChange) onStatusChange('synced', user);
     } else {
       authUser = null;
-      if (onStatusChange) onStatusChange('local', null);
+      if (onStatusChange) onStatusChange('unauthenticated', null);
     }
   });
 
@@ -340,5 +343,15 @@ export async function deleteUserCloudData(user) {
       console.error(`Failed to delete collection ${collName} for user:`, err);
     }
   }
+}
+
+// Clear all local Zustand store caches and localStorage entries
+export function clearAllLocalStores() {
+  useProgressStore.getState().clearStore();
+  useNotesStore.getState().clearStore();
+  useRevisionStore.getState().clearStore();
+  localStorage.removeItem('dsa-progress-v2');
+  localStorage.removeItem('dsa-notes-v2');
+  localStorage.removeItem('dsa-revisions-v2');
 }
 
