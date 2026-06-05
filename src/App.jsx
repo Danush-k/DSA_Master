@@ -19,7 +19,8 @@ import {
   signInWithPopup,
   deleteUser,
   sendPasswordResetEmail,
-  sendEmailVerification
+  sendEmailVerification,
+  linkWithPopup
 } from 'firebase/auth';
 import { initDbSync, deleteUserCloudData, clearAllLocalStores } from './services/dbSync.js';
 
@@ -2289,7 +2290,11 @@ function AppLayout() {
 
   // Auth Guarding Routing Rules
   const isAuthenticated = user !== null;
-  const isEmailVerified = user ? (user.emailVerified || user.providerData.some(p => p.providerId === 'google.com')) : false;
+  const isEmailVerified = user ? (
+    user.emailVerified || 
+    user.email?.endsWith('@dsamastery.local') || 
+    user.providerData.some(p => p.providerId === 'google.com')
+  ) : false;
 
   useEffect(() => {
     if (syncStatus !== 'loading') {
@@ -2843,7 +2848,7 @@ function RoadmapPage() {
 function LoginPage({ user }) {
   const navigate = useNavigate();
   const [mode, setMode] = useState('signin'); // 'signin', 'signup', 'forgot'
-  const [email, setEmail] = useState('');
+  const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -2851,7 +2856,9 @@ function LoginPage({ user }) {
 
   useEffect(() => {
     if (user) {
-      const isEmailVerified = user.emailVerified || user.providerData.some(p => p.providerId === 'google.com');
+      const isEmailVerified = user.emailVerified || 
+        user.email?.endsWith('@dsamastery.local') || 
+        user.providerData.some(p => p.providerId === 'google.com');
       if (isEmailVerified) {
         navigate('/');
       } else {
@@ -2864,18 +2871,27 @@ function LoginPage({ user }) {
     e.preventDefault();
     setError('');
     setSuccess('');
-    if (!email.trim()) return;
+    if (!usernameOrEmail.trim()) return;
     if (mode !== 'forgot' && !password.trim()) return;
+
+    const formattedEmail = usernameOrEmail.includes('@')
+      ? usernameOrEmail.trim()
+      : `${usernameOrEmail.trim().toLowerCase()}@dsamastery.local`;
 
     setLoading(true);
     try {
       if (mode === 'signup') {
-        const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password.trim());
-        await sendEmailVerification(userCredential.user);
+        const userCredential = await createUserWithEmailAndPassword(auth, formattedEmail, password.trim());
+        if (!formattedEmail.endsWith('@dsamastery.local')) {
+          await sendEmailVerification(userCredential.user);
+        }
       } else if (mode === 'signin') {
-        await signInWithEmailAndPassword(auth, email.trim(), password.trim());
+        await signInWithEmailAndPassword(auth, formattedEmail, password.trim());
       } else if (mode === 'forgot') {
-        await sendPasswordResetEmail(auth, email.trim());
+        if (!usernameOrEmail.includes('@')) {
+          throw new Error('Password reset is only supported for accounts registered with a real email address.');
+        }
+        await sendPasswordResetEmail(auth, usernameOrEmail.trim());
         setSuccess('Password reset link has been sent to your email.');
       }
     } catch (err) {
@@ -2883,8 +2899,8 @@ function LoginPage({ user }) {
       let errMsg = err.message;
       if (err.code === 'auth/wrong-password') errMsg = 'Incorrect password.';
       if (err.code === 'auth/user-not-found') errMsg = 'User not found.';
-      if (err.code === 'auth/email-already-in-use') errMsg = 'Email already in use.';
-      if (err.code === 'auth/invalid-credential') errMsg = 'Invalid login credentials.';
+      if (err.code === 'auth/email-already-in-use') errMsg = 'This username or email is already taken.';
+      if (err.code === 'auth/invalid-credential') errMsg = 'Invalid credentials.';
       setError(errMsg);
     } finally {
       setLoading(false);
@@ -2963,12 +2979,12 @@ function LoginPage({ user }) {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="lc-input-group">
-            <label>Email Address</label>
+            <label>Username or Email</label>
             <input
-              type="email"
-              placeholder="name@example.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+              type="text"
+              placeholder="Username or email address"
+              value={usernameOrEmail}
+              onChange={e => setUsernameOrEmail(e.target.value)}
               required
               className="lc-input"
             />
@@ -3184,6 +3200,7 @@ function ProfilePage({ user, syncStatus }) {
   const allQuestions = useAllQuestions();
   const activeProfileId = useProgressStore((s) => s.activeProfileId);
   const profile = useProgressStore((s) => s.profiles[activeProfileId] || {});
+  const isGoogleLinked = user?.providerData?.some(p => p.providerId === 'google.com');
   
   // Solved and status metrics
   const questionStatus = profile.questionStatus || {};
@@ -3303,6 +3320,20 @@ function ProfilePage({ user, syncStatus }) {
     }
   };
 
+  // Link Google Account helper
+  const handleLinkGoogle = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      if (!auth.currentUser) return;
+      await linkWithPopup(auth.currentUser, provider);
+      alert("Success! Your Google account has been successfully linked.");
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
+      alert(`Linking Google account failed: ${err.message}`);
+    }
+  };
+
   // SVG circular chart variables
   const radius = 56;
   const strokeWidth = 8;
@@ -3352,6 +3383,29 @@ function ProfilePage({ user, syncStatus }) {
             <button className="btn btn-secondary btn-sm" onClick={handleBackup} style={{ width: '100%' }}>
               📥 Backup Data (JSON)
             </button>
+            {user && !isGoogleLinked && (
+              <button 
+                className="btn btn-secondary btn-sm" 
+                onClick={handleLinkGoogle} 
+                style={{ 
+                  width: '100%', 
+                  background: 'rgba(255, 161, 22, 0.1)', 
+                  border: '1px solid rgba(255, 161, 22, 0.3)', 
+                  color: '#ffa116',
+                  fontWeight: 600 
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#ffa116';
+                  e.currentTarget.style.color = '#1a1a2e';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 161, 22, 0.1)';
+                  e.currentTarget.style.color = '#ffa116';
+                }}
+              >
+                🔗 Link Google Account
+              </button>
+            )}
             {user && (
               <>
                 <button className="btn btn-secondary btn-sm" onClick={handleLogout} style={{ width: '100%' }}>
