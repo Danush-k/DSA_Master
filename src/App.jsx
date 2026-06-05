@@ -2436,6 +2436,17 @@ function ConceptCard({ step, allQuestions, questionStatus }) {
   const pattern = patterns[step.patternId];
   const topic   = topics.find(t => t.id === step.topicId);
   const lc = LEVEL_CONFIG[step.level];
+  const toggleStatus = useProgressStore((s) => s.toggleStatus);
+  const scheduleRevision = useRevisionStore((s) => s.scheduleRevision);
+
+  const handleCheckClick = (qId, isSolved) => {
+    if (!isSolved) {
+      toggleStatus(qId, 'solved');
+      scheduleRevision(qId);
+    } else {
+      toggleStatus(qId, 'solved');
+    }
+  };
 
   const conceptQs = useMemo(() =>
     allQuestions
@@ -2542,10 +2553,15 @@ function ConceptCard({ step, allQuestions, questionStatus }) {
                   className={`lc-prob-row ${isSolved ? 'lc-prob-solved' : ''} ${idx % 2 === 0 ? 'lc-prob-stripe' : ''}`}
                 >
                   {/* Checkbox */}
-                  <div className="lc-prob-check" style={{
-                    border: `1.5px solid ${isSolved ? 'var(--success)' : 'var(--border-secondary)'}`,
-                    background: isSolved ? 'var(--success)' : 'transparent',
-                  }}>
+                  <div 
+                    className="lc-prob-check" 
+                    style={{
+                      border: `1.5px solid ${isSolved ? 'var(--success)' : 'var(--border-secondary)'}`,
+                      background: isSolved ? 'var(--success)' : 'transparent',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => handleCheckClick(q.id, isSolved)}
+                  >
                     {isSolved && <Check size={9} strokeWidth={3} color="#fff" />}
                   </div>
 
