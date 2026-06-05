@@ -8,7 +8,8 @@ import {
   Menu, X, Filter, Clock, Flame, Calendar, ChevronDown, ChevronUp, BarChart3, Info,
   ArrowUpDown, Binary, ChevronsLeftRight, Columns, GitBranch, Grid, Hash, Layers,
   Link as LinkIcon, Network, Sparkles, Star, TrendingUp, Type, Zap,
-  Cloud, CloudOff, RefreshCw, User, Map
+  Cloud, CloudOff, RefreshCw, User, Map, Settings, Download, Upload, LogOut, Trash2,
+  AlertCircle, Mail, Trophy, AlertTriangle
 } from 'lucide-react';
 import { auth } from './firebaseClient.js';
 import {
@@ -34,6 +35,75 @@ const Youtube = ({ size = 24, fill = "currentColor", ...props }) => (
     {...props}
   >
     <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.518 3.545 12 3.545 12 3.545s-7.518 0-9.388.508a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11c1.87.508 9.388.508 9.388.508s7.518 0 9.388-.508a3.003 3.003 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+  </svg>
+);
+
+// LeetCode official logo
+const LeetCodeLogo = ({ size = 14 }) => (
+  <svg viewBox="0 0 95 111" width={size} height={size * (111/95)} fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M54.2 40.5H89a4.5 4.5 0 0 1 0 9H54.2a4.5 4.5 0 0 1 0-9Z" fill="#FFA116"/>
+    <path fillRule="evenodd" clipRule="evenodd" d="M28.7 7.5a4.5 4.5 0 0 1 6.37 0L66.8 39.12a4.5 4.5 0 0 1-6.36 6.36L28.7 13.87a4.5 4.5 0 0 1 0-6.37Z" fill="#B3B3B3"/>
+    <path fillRule="evenodd" clipRule="evenodd" d="M28.7 103.5a4.5 4.5 0 0 0 6.37 0L66.8 71.88a4.5 4.5 0 0 0-6.36-6.36L28.7 97.13a4.5 4.5 0 0 0 0 6.37Z" fill="#B3B3B3"/>
+    <path fillRule="evenodd" clipRule="evenodd" d="M7.5 28.2a4.5 4.5 0 0 1 0-6.37L39.12 50a4.5 4.5 0 0 1-6.37 6.37L1.13 28.2Z" fill="currentColor"/>
+  </svg>
+);
+
+const getAvatarColor = (avatarValue, name = 'Default') => {
+  if (avatarValue && avatarValue.startsWith('#')) return avatarValue;
+  const colors = [
+    '#FFA116', // LeetCode Orange
+    '#00b8a3', // LeetCode Green
+    '#38BDF8', // Sky Blue
+    '#A78BFA', // Purple
+    '#F43F5E', // Rose
+    '#FBBF24', // Amber
+    '#34D399', // Emerald
+    '#6366F1'  // Indigo
+  ];
+  let hash = 0;
+  const str = name || '';
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % colors.length;
+  return colors[index];
+};
+
+const renderAvatar = (avatarValue, name = 'Default', size = 20) => {
+  const color = getAvatarColor(avatarValue, name);
+  const initial = name ? name.trim().charAt(0).toUpperCase() : 'D';
+  return (
+    <div 
+      className="avatar-circle"
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        backgroundColor: color,
+        color: '#ffffff',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontWeight: 600,
+        fontSize: Math.max(10, Math.floor(size * 0.45)),
+        textTransform: 'uppercase',
+        fontFamily: 'var(--font-sans)',
+        lineHeight: 1,
+        flexShrink: 0,
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        border: '1px solid rgba(255,255,255,0.1)'
+      }}
+    >
+      {initial}
+    </div>
+  );
+};
+
+// YouTube official logo
+const YoutubeLogo = ({ size = 16 }) => (
+  <svg viewBox="0 0 71 50" width={size} height={size * (50/71)} fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M69.35 7.83A8.91 8.91 0 0 0 63.1 1.56C57.55 0 35.5 0 35.5 0S13.45 0 7.9 1.56A8.91 8.91 0 0 0 1.65 7.83C0 13.43 0 25 0 25s0 11.57 1.65 17.17A8.91 8.91 0 0 0 7.9 48.44C13.45 50 35.5 50 35.5 50s22.05 0 27.6-1.56a8.91 8.91 0 0 0 6.25-6.27C71 36.57 71 25 71 25s0-11.57-1.65-17.17Z" fill="#FF0000"/>
+    <path d="M28.4 35.6 46.78 25 28.4 14.4v21.2Z" fill="#fff"/>
   </svg>
 );
 
@@ -229,7 +299,9 @@ function Sidebar({ isOpen, onClose }) {
       {isOpen && <div className="sidebar-overlay" onClick={onClose} />}
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-logo">
-          <div className="sidebar-logo-icon">⚡</div>
+          <div className="sidebar-logo-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <LeetCodeLogo size={20} />
+          </div>
           <span className="sidebar-logo-text">Danush</span>
         </div>
         <nav className="sidebar-nav">
@@ -336,8 +408,8 @@ function Header({ title, onMenuClick, onManageProfiles, syncStatus, user, onAuth
 
         {/* Profile Selector */}
         <div style={{ position: 'relative' }}>
-          <button className="profile-btn" onClick={() => setProfileDropdownOpen(!profileDropdownOpen)} title="Switch profile">
-            <span style={{ fontSize: 18 }}>{activeProfile?.avatar || '⚡'}</span>
+          <button className="profile-btn" onClick={() => setProfileDropdownOpen(!profileDropdownOpen)} title="Switch profile" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {renderAvatar(activeProfile?.avatar, activeProfile?.name, 22)}
             <span className="profile-btn-name">{activeProfile?.name || 'Default'}</span>
             <ChevronDown size={14} style={{ opacity: 0.7 }} />
           </button>
@@ -352,8 +424,9 @@ function Header({ title, onMenuClick, onManageProfiles, syncStatus, user, onAuth
                     switchProfile(id);
                     setProfileDropdownOpen(false);
                   }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8 }}
                 >
-                  <span style={{ fontSize: 16 }}>{p.avatar}</span>
+                  {renderAvatar(p.avatar, p.name, 18)}
                   <span style={{ flex: 1, textAlign: 'left' }}>{p.name}</span>
                   {id === activeProfileId && <Check size={14} className="active-check" />}
                 </button>
@@ -363,9 +436,9 @@ function Header({ title, onMenuClick, onManageProfiles, syncStatus, user, onAuth
                 to="/profile"
                 className="profile-dropdown-item"
                 onClick={() => setProfileDropdownOpen(false)}
-                style={{ color: 'inherit' }}
+                style={{ color: 'inherit', display: 'flex', alignItems: 'center', gap: 8 }}
               >
-                👤 View Profile Page
+                <User size={14} /> View Profile Page
               </Link>
               <button
                 className="profile-dropdown-item"
@@ -373,8 +446,9 @@ function Header({ title, onMenuClick, onManageProfiles, syncStatus, user, onAuth
                   onManageProfiles();
                   setProfileDropdownOpen(false);
                 }}
+                style={{ display: 'flex', alignItems: 'center', gap: 8 }}
               >
-                ⚙️ Manage Profiles
+                <Settings size={14} /> Manage Profiles
               </button>
             </div>
           )}
@@ -477,7 +551,10 @@ function NotesModal({ question, onClose }) {
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div>
-            <div className="modal-title">📝 Notes</div>
+            <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <StickyNote size={18} style={{ color: 'var(--accent-primary)' }} />
+              Notes
+            </div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>
               {question.num}. {question.title}
             </div>
@@ -487,16 +564,19 @@ function NotesModal({ question, onClose }) {
         <div className="modal-body">
           <div className="notes-form">
             {[
-              { key: 'keyIdea', label: '💡 Key Idea', placeholder: 'What is the core insight?' },
-              { key: 'optimalApproach', label: '🎯 Optimal Approach', placeholder: 'Describe the best approach step by step' },
-              { key: 'timeComplexity', label: '⏱️ Time Complexity', placeholder: 'e.g., O(n log n)' },
-              { key: 'spaceComplexity', label: '💾 Space Complexity', placeholder: 'e.g., O(n)' },
-              { key: 'mistakes', label: '⚠️ Mistakes Made', placeholder: 'Common pitfalls and errors to avoid' },
-              { key: 'interviewLearnings', label: '🎤 Interview Learnings', placeholder: 'What would you say in an interview?' },
-              { key: 'notes', label: '📋 Additional Notes', placeholder: 'Any other notes...' },
-            ].map(({ key, label, placeholder }) => (
+              { key: 'keyIdea', label: 'Key Idea', icon: Sparkles, placeholder: 'What is the core insight?' },
+              { key: 'optimalApproach', label: 'Optimal Approach', icon: Target, placeholder: 'Describe the best approach step by step' },
+              { key: 'timeComplexity', label: 'Time Complexity', icon: Clock, placeholder: 'e.g., O(n log n)' },
+              { key: 'spaceComplexity', label: 'Space Complexity', icon: Layers, placeholder: 'e.g., O(n)' },
+              { key: 'mistakes', label: 'Mistakes Made', icon: AlertTriangle, placeholder: 'Common pitfalls and errors to avoid' },
+              { key: 'interviewLearnings', label: 'Interview Learnings', icon: Info, placeholder: 'What would you say in an interview?' },
+              { key: 'notes', label: 'Additional Notes', icon: StickyNote, placeholder: 'Any other notes...' },
+            ].map(({ key, label, icon: IconComponent, placeholder }) => (
               <div className="notes-field" key={key}>
-                <label>{label}</label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <IconComponent size={14} style={{ color: 'var(--text-secondary)' }} />
+                  {label}
+                </label>
                 <textarea
                   value={form[key]}
                   onChange={(e) => setForm({ ...form, [key]: e.target.value })}
@@ -1025,12 +1105,12 @@ function DashboardPage() {
           </div>
           <div className="streak-container">
             <div className="streak-item">
-              <span className="streak-fire">🔥</span>
+              <span className="streak-fire"><Flame size={24} style={{ color: '#f97316', fill: '#f97316', display: 'block' }} /></span>
               <span className="streak-value">{currentStreak}</span>
               <span className="streak-label">Current Streak</span>
             </div>
             <div className="streak-item">
-              <span className="streak-fire">⚡</span>
+              <span className="streak-fire"><Trophy size={24} style={{ color: '#eab308', fill: '#eab308', display: 'block' }} /></span>
               <span className="streak-value">{longestStreak}</span>
               <span className="streak-label">Longest Streak</span>
             </div>
@@ -1043,7 +1123,7 @@ function DashboardPage() {
           </div>
           {dueRevisionsList.length === 0 ? (
             <div style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
-              ✅ No revisions due today. Great job!
+              <Check size={16} style={{ color: 'var(--success)', verticalAlign: 'middle', marginRight: 6, display: 'inline' }} /> No revisions due today. Great job!
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1123,7 +1203,7 @@ function TopicsPage() {
   return (
     <div className="page-content animate-fade-in">
       <div style={{ marginBottom: 'var(--space-7)' }}>
-        <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }}>📚 DSA Topics</h2>
+        <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}><BookOpen size={24} style={{ color: 'var(--accent-primary)' }} /> DSA Topics</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
           Master each topic from beginner to advanced. Topics are ordered for optimal learning progression.
         </p>
@@ -1330,7 +1410,7 @@ function SheetPage() {
     <div className="page-content animate-fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-5)' }}>
         <div>
-          <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }}>📋 Complete Problem Sheet</h2>
+          <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}><ListChecks size={24} style={{ color: 'var(--accent-primary)' }} /> Complete Problem Sheet</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
             {allQuestions.length} curated problems · Sorted by topic and pattern · Click any problem to open on LeetCode
           </p>
@@ -1360,8 +1440,8 @@ function SheetPage() {
         </select>
         <select className="filter-select" value={filterImportance} onChange={e => setFilterImportance(e.target.value)}>
           <option value="all">All Importance</option>
-          <option value="Must Do">🔥 Must Do</option>
-          <option value="Recommended">⭐ Recommended</option>
+          <option value="Must Do">Must Do</option>
+          <option value="Recommended">Recommended</option>
           <option value="Good to Know">Good to Know</option>
         </select>
         <select className="filter-select" value={filterCompany} onChange={e => setFilterCompany(e.target.value)}>
@@ -1400,7 +1480,7 @@ function PatternsListPage() {
   return (
     <div className="page-content animate-fade-in">
       <div style={{ marginBottom: 'var(--space-7)' }}>
-        <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4 }}>🎯 DSA Patterns</h2>
+        <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}><Target size={24} style={{ color: 'var(--accent-primary)' }} /> DSA Patterns</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
           Learn to recognize patterns — the key skill that separates good from great problem solvers.
         </p>
@@ -1543,17 +1623,26 @@ function PatternDetailPage() {
 
               {/* When to Use / Not Use */}
               <div className="card pattern-section">
-                <div className="pattern-section-title">✅ When to Use</div>
+                <div className="pattern-section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Check size={16} style={{ color: 'var(--success)' }} />
+                  When to Use
+                </div>
                 <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>
                   {pat.whenToUse}
                 </p>
-                <div className="pattern-section-title">❌ When NOT to Use</div>
+                <div className="pattern-section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <X size={16} style={{ color: 'var(--error)' }} />
+                  When NOT to Use
+                </div>
                 <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>
                   {pat.whenNotToUse}
                 </p>
                 {pat.interviewTips && (
                   <>
-                    <div className="pattern-section-title">💡 Interview Tips</div>
+                    <div className="pattern-section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Sparkles size={16} style={{ color: 'var(--accent-primary)' }} />
+                      Interview Tips
+                    </div>
                     <p style={{ fontSize: 14, color: 'var(--accent-primary)', lineHeight: 1.6, fontStyle: 'italic' }}>
                       {pat.interviewTips}
                     </p>
@@ -1564,7 +1653,10 @@ function PatternDetailPage() {
               {/* Common Mistakes */}
               {pat.commonMistakes && (
                 <div className="card pattern-section" style={{ gridColumn: 'span 2' }}>
-                  <div className="pattern-section-title">⚠️ Common Mistakes</div>
+                    <div className="pattern-section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <AlertTriangle size={16} style={{ color: 'var(--error)' }} />
+                      Common Mistakes
+                    </div>
                   <ul className="clue-list">
                     {pat.commonMistakes.map((m, i) => (
                       <li className="clue-item" key={i} style={{ background: 'var(--error-bg)' }}>
@@ -1635,7 +1727,7 @@ function RevisionPage() {
         {dueRevisions.length === 0 ? (
           <div className="card">
             <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
+              <div style={{ display: 'flex', justifyContent: 'center', color: 'var(--success)', marginBottom: 12 }}><Sparkles size={48} /></div>
               <div className="empty-state-title">All caught up!</div>
               <div className="empty-state-desc">No revisions due today. Keep solving problems to build your revision queue.</div>
             </div>
@@ -1795,9 +1887,20 @@ function ProfileManagerModal({ onClose }) {
   const deleteRevisionProfile = useRevisionStore((s) => s.deleteProfile);
 
   const [newName, setNewName] = useState('');
-  const [selectedAvatar, setSelectedAvatar] = useState('🦊');
+  const [selectedAvatar, setSelectedAvatar] = useState('#FFA116');
 
-  const avatarOptions = ['🦊', '🐼', '🦁', '🐯', '🐸', '🐙', '🐵', '⚡', '🚀', '💻', '⭐', '🔥'];
+  const avatarOptions = [
+    '#FFA116', // LeetCode Orange
+    '#00b8a3', // LeetCode Green
+    '#38BDF8', // Sky Blue
+    '#A78BFA', // Purple
+    '#F43F5E', // Rose
+    '#FBBF24', // Amber
+    '#34D399', // Emerald
+    '#6366F1', // Indigo
+    '#EC4899', // Pink
+    '#14B8A6', // Teal
+  ];
 
   const handleCreate = (e) => {
     e.preventDefault();
@@ -1868,12 +1971,12 @@ function ProfileManagerModal({ onClose }) {
             activeProfileId: backup.progress.activeProfileId,
           });
           
-          alert('🎉 Backup imported successfully!');
+          alert('Backup imported successfully!');
         } else {
-          alert('❌ Invalid backup file format.');
+          alert('Invalid backup file format.');
         }
       } catch (err) {
-        alert('❌ Failed to parse backup file.');
+        alert('Failed to parse backup file.');
       }
     };
     reader.readAsText(file);
@@ -1883,7 +1986,7 @@ function ProfileManagerModal({ onClose }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 500 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <div className="modal-title">👤 Profile Management</div>
+          <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><User size={18} /> Profile Management</div>
           <button className="modal-close" onClick={onClose}><X size={18} /></button>
         </div>
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -1900,7 +2003,7 @@ function ProfileManagerModal({ onClose }) {
                     border: id === activeProfileId ? '1px solid var(--accent-primary)' : '1px solid var(--border-primary)',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span style={{ fontSize: 20 }}>{p.avatar}</span>
+                      {renderAvatar(p.avatar, p.name, 24)}
                       <div>
                         <span style={{ fontWeight: 500, fontSize: 14 }}>{p.name}</span>
                         <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{solvedCount} solved</div>
@@ -1940,20 +2043,21 @@ function ProfileManagerModal({ onClose }) {
             </div>
             <div className="notes-field" style={{ marginBottom: 12 }}>
               <label>Choose Avatar</label>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-                {avatarOptions.map(emoji => (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+                {avatarOptions.map(color => (
                   <button
-                    key={emoji}
+                    key={color}
                     type="button"
-                    onClick={() => setSelectedAvatar(emoji)}
+                    onClick={() => setSelectedAvatar(color)}
                     style={{
-                      fontSize: 20, width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: selectedAvatar === emoji ? 'var(--accent-glow)' : 'var(--bg-tertiary)',
-                      border: selectedAvatar === emoji ? '1px solid var(--accent-primary)' : '1px solid var(--border-primary)',
-                      borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                      width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: color,
+                      border: selectedAvatar === color ? '2px solid var(--text-primary)' : '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '50%', cursor: 'pointer',
+                      boxShadow: selectedAvatar === color ? '0 0 8px var(--accent-primary)' : 'none',
                     }}
                   >
-                    {emoji}
+                    {selectedAvatar === color && <Check size={14} color="#ffffff" style={{ filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.5))' }} />}
                   </button>
                 ))}
               </div>
@@ -1965,11 +2069,11 @@ function ProfileManagerModal({ onClose }) {
           <div style={{ borderTop: '1px solid var(--border-primary)', paddingTop: 12 }}>
             <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>Backup & Restore</h3>
             <div style={{ display: 'flex', gap: 12 }}>
-              <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={handleExportBackup}>
-                📥 Export Backup
+              <button type="button" className="btn btn-secondary" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={handleExportBackup}>
+                <Download size={14} /> Export Backup
               </button>
-              <label className="btn btn-secondary" style={{ flex: 1, textAlign: 'center', cursor: 'pointer' }}>
-                📤 Import Backup
+              <label className="btn btn-secondary" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer' }}>
+                <Upload size={14} /> Import Backup
                 <input
                   type="file"
                   accept=".json"
@@ -2128,8 +2232,8 @@ function AddCustomQuestionModal({ onClose }) {
                     color: 'var(--text-primary)', fontSize: 14,
                   }}
                 >
-                  <option value="Must Do">🔥 Must Do</option>
-                  <option value="Recommended">⭐ Recommended</option>
+                  <option value="Must Do">Must Do</option>
+                  <option value="Recommended">Recommended</option>
                   <option value="Good to Know">Good to Know</option>
                 </select>
               </div>
@@ -2319,7 +2423,9 @@ function AppLayout() {
     return (
       <div className="lc-loading-screen">
         <div className="lc-loading-card">
-          <div className="lc-logo-circle spin-glow">⚡</div>
+          <div className="lc-logo-circle spin-glow" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <LeetCodeLogo size={36} />
+          </div>
           <h2 className="lc-loading-title">DSA Mastery</h2>
           <div className="lc-loading-subtitle">Loading your workspace...</div>
           <div className="lc-spinner"></div>
@@ -2393,26 +2499,6 @@ const LEVEL_CONFIG = {
   Intermediate: { color: '#ffc01e', bg: 'rgba(255,192,30,0.1)',  border: 'rgba(255,192,30,0.25)',  label: 'Medium', abbr: 'Medium' },
   Advanced:     { color: '#ff375f', bg: 'rgba(255,55,95,0.1)',   border: 'rgba(255,55,95,0.25)',   label: 'Hard',   abbr: 'Hard'   },
 };
-
-// ── Professional SVG Logos ──────────────────────────────────────
-
-// YouTube official logo
-const YoutubeLogo = ({ size = 16 }) => (
-  <svg viewBox="0 0 71 50" width={size} height={size * (50/71)} fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M69.35 7.83A8.91 8.91 0 0 0 63.1 1.56C57.55 0 35.5 0 35.5 0S13.45 0 7.9 1.56A8.91 8.91 0 0 0 1.65 7.83C0 13.43 0 25 0 25s0 11.57 1.65 17.17A8.91 8.91 0 0 0 7.9 48.44C13.45 50 35.5 50 35.5 50s22.05 0 27.6-1.56a8.91 8.91 0 0 0 6.25-6.27C71 36.57 71 25 71 25s0-11.57-1.65-17.17Z" fill="#FF0000"/>
-    <path d="M28.4 35.6 46.78 25 28.4 14.4v21.2Z" fill="#fff"/>
-  </svg>
-);
-
-// LeetCode official logo
-const LeetCodeLogo = ({ size = 14 }) => (
-  <svg viewBox="0 0 95 111" width={size} height={size * (111/95)} fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M54.2 40.5H89a4.5 4.5 0 0 1 0 9H54.2a4.5 4.5 0 0 1 0-9Z" fill="#FFA116"/>
-    <path fillRule="evenodd" clipRule="evenodd" d="M28.7 7.5a4.5 4.5 0 0 1 6.37 0L66.8 39.12a4.5 4.5 0 0 1-6.36 6.36L28.7 13.87a4.5 4.5 0 0 1 0-6.37Z" fill="#B3B3B3"/>
-    <path fillRule="evenodd" clipRule="evenodd" d="M28.7 103.5a4.5 4.5 0 0 0 6.37 0L66.8 71.88a4.5 4.5 0 0 0-6.36-6.36L28.7 97.13a4.5 4.5 0 0 0 0 6.37Z" fill="#B3B3B3"/>
-    <path fillRule="evenodd" clipRule="evenodd" d="M7.5 28.2a4.5 4.5 0 0 1 0-6.37L39.12 50a4.5 4.5 0 0 1-6.37 6.37L1.13 28.2Z" fill="#070706"/>
-  </svg>
-);
 
 // Circular progress SVG
 const CircleProgress = ({ pct = 0, size = 36, color = '#00b8a3', trackColor = 'rgba(255,255,255,0.08)' }) => {
@@ -2944,7 +3030,9 @@ function LoginPage({ user }) {
     <div className="lc-login-container">
       <div className="lc-login-card">
         <div className="lc-login-header">
-          <div className="lc-logo-circle">⚡</div>
+          <div className="lc-logo-circle" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <LeetCodeLogo size={36} />
+          </div>
           <h2 className="lc-login-title">
             {mode === 'forgot' ? 'Reset Password' : 'DSA Mastery'}
           </h2>
@@ -2979,7 +3067,7 @@ function LoginPage({ user }) {
             border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 'var(--radius-md)',
             color: 'var(--error)', fontSize: 13, lineHeight: 1.4, textAlign: 'center'
           }}>
-            ⚠️ {error}
+            <AlertTriangle size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> {error}
           </div>
         )}
 
@@ -2989,7 +3077,7 @@ function LoginPage({ user }) {
             border: '1px solid rgba(0, 184, 163, 0.2)', borderRadius: 'var(--radius-md)',
             color: 'var(--success)', fontSize: 13, lineHeight: 1.4, textAlign: 'center'
           }}>
-            🟢 {success}
+            <Check size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} color="var(--success)" /> {success}
           </div>
         )}
 
@@ -3153,7 +3241,7 @@ function VerifyEmailPage({ user }) {
     <div className="lc-login-container">
       <div className="lc-login-card" style={{ textAlign: 'center' }}>
         <div className="lc-login-header">
-          <div className="lc-logo-circle" style={{ border: '2px solid var(--accent-primary)' }}>✉️</div>
+          <div className="lc-logo-circle" style={{ border: '2px solid var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Mail size={32} color="var(--accent-primary)" /></div>
           <h2 className="lc-login-title">Verify Your Email</h2>
         </div>
         
@@ -3167,7 +3255,7 @@ function VerifyEmailPage({ user }) {
             border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 'var(--radius-md)',
             color: 'var(--error)', fontSize: 13, lineHeight: 1.4, textAlign: 'center'
           }}>
-            ⚠️ {error}
+            <AlertTriangle size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> {error}
           </div>
         )}
 
@@ -3177,7 +3265,7 @@ function VerifyEmailPage({ user }) {
             border: '1px solid rgba(0, 184, 163, 0.2)', borderRadius: 'var(--radius-md)',
             color: 'var(--success)', fontSize: 13, lineHeight: 1.4, textAlign: 'center'
           }}>
-            🟢 {message}
+            <Check size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} color="var(--success)" /> {message}
           </div>
         )}
 
@@ -3304,7 +3392,7 @@ function ProfilePage({ user, syncStatus }) {
   // Delete user account and cascading data
   const handleDeleteAccount = async () => {
     const confirmed = window.confirm(
-      "⚠️ WARNING: Are you sure you want to permanently delete your account?\n\n" +
+      "WARNING: Are you sure you want to permanently delete your account?\n\n" +
       "This will cascadingly delete ALL your profiles, solved progress, custom questions, notes, and revision data from the cloud database. This action CANNOT be undone."
     );
     if (!confirmed) return;
@@ -3364,7 +3452,7 @@ function ProfilePage({ user, syncStatus }) {
           <div className="profile-card">
             <div className="profile-user-info">
               <div className="profile-avatar-large">
-                {profile.avatar || '🦊'}
+                {renderAvatar(profile.avatar, profile.name, 72)}
               </div>
               <div className="profile-display-name">
                 {user?.displayName || profile.name}
@@ -3393,11 +3481,11 @@ function ProfilePage({ user, syncStatus }) {
             <h4 style={{ fontSize: 14, fontWeight: 700, borderBottom: '1px solid var(--border-primary)', paddingBottom: 8 }}>
               Account Settings
             </h4>
-            <button className="btn btn-secondary btn-sm" onClick={() => setManagerOpen(true)} style={{ width: '100%' }}>
-              ⚙️ Switch/Manage Profile
+            <button className="btn btn-secondary btn-sm" onClick={() => setManagerOpen(true)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Settings size={14} /> Switch/Manage Profile
             </button>
-            <button className="btn btn-secondary btn-sm" onClick={handleBackup} style={{ width: '100%' }}>
-              📥 Backup Data (JSON)
+            <button className="btn btn-secondary btn-sm" onClick={handleBackup} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Download size={14} /> Backup Data (JSON)
             </button>
             {user && !isGoogleLinked && (
               <button 
@@ -3408,7 +3496,11 @@ function ProfilePage({ user, syncStatus }) {
                   background: 'rgba(255, 161, 22, 0.1)', 
                   border: '1px solid rgba(255, 161, 22, 0.3)', 
                   color: '#ffa116',
-                  fontWeight: 600 
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = '#ffa116';
@@ -3419,13 +3511,13 @@ function ProfilePage({ user, syncStatus }) {
                   e.currentTarget.style.color = '#ffa116';
                 }}
               >
-                🔗 Link Google Account
+                <ExternalLink size={14} /> Link Google Account
               </button>
             )}
             {user && (
               <>
-                <button className="btn btn-secondary btn-sm" onClick={handleLogout} style={{ width: '100%' }}>
-                  🚪 Sign Out
+                <button className="btn btn-secondary btn-sm" onClick={handleLogout} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  <LogOut size={14} /> Sign Out
                 </button>
                 <div style={{ borderTop: '1px solid var(--border-primary)', marginTop: 8, paddingTop: 8 }}>
                   <button
@@ -3436,7 +3528,11 @@ function ProfilePage({ user, syncStatus }) {
                       background: 'rgba(239, 68, 68, 0.1)',
                       border: '1px solid rgba(239, 68, 68, 0.3)',
                       color: 'var(--error)',
-                      fontWeight: 600
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.background = 'var(--error)';
@@ -3447,7 +3543,7 @@ function ProfilePage({ user, syncStatus }) {
                       e.currentTarget.style.color = 'var(--error)';
                     }}
                   >
-                    ⚠️ Delete Account
+                    <Trash2 size={14} /> Delete Account
                   </button>
                 </div>
               </>
@@ -3541,17 +3637,17 @@ function ProfilePage({ user, syncStatus }) {
           {/* Stats Boxes */}
           <div className="profile-streak-grid">
             <div className="profile-stat-box">
-              <span className="profile-stat-box-icon">🔥</span>
+              <span className="profile-stat-box-icon"><Flame size={20} style={{ color: '#f97316' }} /></span>
               <span className="profile-stat-box-val">{currentStreak}</span>
               <span className="profile-stat-box-lbl">Current Streak</span>
             </div>
             <div className="profile-stat-box">
-              <span className="profile-stat-box-icon">🏆</span>
+              <span className="profile-stat-box-icon"><Trophy size={20} style={{ color: '#eab308' }} /></span>
               <span className="profile-stat-box-val">{longestStreak}</span>
               <span className="profile-stat-box-lbl">Longest Streak</span>
             </div>
             <div className="profile-stat-box">
-              <span className="profile-stat-box-icon">📝</span>
+              <span className="profile-stat-box-icon"><StickyNote size={20} style={{ color: 'var(--accent-primary)' }} /></span>
               <span className="profile-stat-box-val">{totalNotes}</span>
               <span className="profile-stat-box-lbl">Study Notes</span>
             </div>
@@ -3662,7 +3758,7 @@ function AuthModal({ onClose, user }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <div className="modal-title">☁️ Cloud Database Sync</div>
+          <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Cloud size={18} /> Cloud Database Sync</div>
           <button className="modal-close" onClick={onClose}><X size={18} /></button>
         </div>
         {user ? (
@@ -3677,8 +3773,8 @@ function AuthModal({ onClose, user }) {
             }}>
               {user.displayName || user.email}
             </div>
-            <p style={{ fontSize: 13, color: 'var(--success)' }}>
-              🟢 Your progress, notes, and revisions are being synchronized in real-time.
+            <p style={{ fontSize: 13, color: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Check size={14} color="var(--success)" /> Your progress, notes, and revisions are being synchronized in real-time.
             </p>
             <button className="btn btn-secondary" onClick={handleLogout} style={{ width: '100%' }}>
               Disconnect / Log Out
@@ -3697,7 +3793,7 @@ function AuthModal({ onClose, user }) {
                   border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 'var(--radius-md)',
                   color: 'var(--error)', fontSize: 13, lineHeight: 1.4
                 }}>
-                  ⚠️ {error}
+                  <AlertTriangle size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> {error}
                 </div>
               )}
 
