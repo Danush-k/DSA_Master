@@ -215,29 +215,45 @@ async function hydrateFromCloud(user) {
     const revisionStoreState = { ...useRevisionStore.getState() };
 
     // Initialize local stores based on dbProfiles
-    profilesSnap.forEach(docSnap => {
-      const p = docSnap.data();
-      const pk = p.profileKey;
-      if (!progressStoreState.profiles[pk]) {
-        progressStoreState.profiles[pk] = {
-          name: p.name,
-          avatar: p.avatar,
-          questionStatus: {},
-          dailySolves: {},
-          bookmarks: [],
-          currentStreak: 0,
-          longestStreak: 0,
-          lastSolveDate: null,
-          customQuestions: []
-        };
-      } else {
-        progressStoreState.profiles[pk].name = p.name;
-        progressStoreState.profiles[pk].avatar = p.avatar;
+    if (profilesSnap.empty) {
+      // Save default local profile for new user
+      const activeProfileId = progressStoreState.activeProfileId || 'default';
+      const localProfile = progressStoreState.profiles[activeProfileId];
+      if (localProfile) {
+        const docId = `${user.uid}_${activeProfileId}`;
+        await setDoc(doc(db, 'profiles', docId), {
+          userId: user.uid,
+          profileKey: activeProfileId,
+          name: localProfile.name || 'Danush',
+          avatar: localProfile.avatar || '🦊',
+          createdAt: new Date().toISOString()
+        });
       }
+    } else {
+      profilesSnap.forEach(docSnap => {
+        const p = docSnap.data();
+        const pk = p.profileKey;
+        if (!progressStoreState.profiles[pk]) {
+          progressStoreState.profiles[pk] = {
+            name: p.name,
+            avatar: p.avatar,
+            questionStatus: {},
+            dailySolves: {},
+            bookmarks: [],
+            currentStreak: 0,
+            longestStreak: 0,
+            lastSolveDate: null,
+            customQuestions: []
+          };
+        } else {
+          progressStoreState.profiles[pk].name = p.name;
+          progressStoreState.profiles[pk].avatar = p.avatar;
+        }
 
-      if (!notesStoreState.profiles[pk]) notesStoreState.profiles[pk] = {};
-      if (!revisionStoreState.profiles[pk]) revisionStoreState.profiles[pk] = {};
-    });
+        if (!notesStoreState.profiles[pk]) notesStoreState.profiles[pk] = {};
+        if (!revisionStoreState.profiles[pk]) revisionStoreState.profiles[pk] = {};
+      });
+    }
 
     // Hydrate progress
     progressSnap.forEach(docSnap => {
