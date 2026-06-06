@@ -3632,6 +3632,146 @@ function VerifyEmailPage({ user }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// AVATAR EDITOR MODAL
+// ═══════════════════════════════════════════════════════════════
+function AvatarEditorModal({ onClose, activeAvatar, name }) {
+  const [activeTab, setActiveTab] = useState(activeAvatar && activeAvatar.startsWith('#') ? 'color' : 'emoji');
+  
+  const colors = [
+    '#FFA116', // LeetCode Orange
+    '#00b8a3', // LeetCode Green
+    '#38BDF8', // Sky Blue
+    '#A78BFA', // Purple
+    '#F43F5E', // Rose
+    '#FBBF24', // Amber
+    '#34D399', // Emerald
+    '#6366F1', // Indigo
+    '#EC4899', // Pink
+    '#14B8A6', // Teal
+  ];
+
+  const emojis = ['🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🦖', '🐉', '👻', '⚡️'];
+
+  const handleSelect = (val) => {
+    useProgressStore.setState((prev) => ({
+      profiles: {
+        ...prev.profiles,
+        'default': {
+          ...prev.profiles['default'],
+          avatar: val
+        }
+      }
+    }));
+  };
+
+  return createPortal(
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <User size={18} /> Edit Profile Avatar
+          </div>
+          <button className="modal-close" onClick={onClose}><X size={18} /></button>
+        </div>
+        
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Tabs */}
+          <div className="lc-tab-container" style={{ marginBottom: 12 }}>
+            <button
+              type="button"
+              className={`lc-tab-btn ${activeTab === 'color' ? 'active' : ''}`}
+              onClick={() => setActiveTab('color')}
+            >
+              Initial & Color
+            </button>
+            <button
+              type="button"
+              className={`lc-tab-btn ${activeTab === 'emoji' ? 'active' : ''}`}
+              onClick={() => setActiveTab('emoji')}
+            >
+              Emoji Avatar
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+            <div style={{ border: '3px solid var(--border-secondary)', borderRadius: '50%', padding: 4 }}>
+              {renderAvatar(activeAvatar, name, 80)}
+            </div>
+          </div>
+
+          {activeTab === 'color' ? (
+            <div>
+              <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10, textAlign: 'center' }}>
+                Select a professional background color for your initials:
+              </p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+                {colors.map(color => (
+                  <button
+                    key={color}
+                    onClick={() => handleSelect(color)}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '50%',
+                      background: color,
+                      border: activeAvatar === color ? '2.5px solid var(--text-primary)' : '1px solid rgba(255,255,255,0.1)',
+                      cursor: 'pointer',
+                      boxShadow: activeAvatar === color ? '0 0 8px var(--accent-primary)' : 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {activeAvatar === color && <Check size={16} color="#ffffff" style={{ filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.5))' }} />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 10, textAlign: 'center' }}>
+                Select a playful emoji for your profile:
+              </p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+                {emojis.map(emoji => (
+                  <button
+                    key={emoji}
+                    onClick={() => handleSelect(emoji)}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '50%',
+                      background: activeAvatar === emoji ? 'var(--bg-tertiary)' : 'none',
+                      border: activeAvatar === emoji ? '1.5px solid var(--accent-primary)' : '1px solid transparent',
+                      fontSize: 20,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+            <button className="btn btn-primary" onClick={onClose} style={{ padding: '8px 24px' }}>
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // LEETCODE-STYLE PROFILE PAGE
 // ═══════════════════════════════════════════════════════════════
 function ProfilePage({ user, syncStatus }) {
@@ -3640,6 +3780,8 @@ function ProfilePage({ user, syncStatus }) {
   const activeProfileId = useProgressStore((s) => s.activeProfileId);
   const profile = useProgressStore((s) => s.profiles[activeProfileId] || {});
   const isGoogleLinked = user?.providerData?.some(p => p.providerId === 'google.com');
+  
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false);
   
   // Solved and status metrics
   const questionStatus = profile.questionStatus || {};
@@ -3789,41 +3931,13 @@ function ProfilePage({ user, syncStatus }) {
               <div className="profile-avatar-large">
                 {renderAvatar(profile.avatar, profile.name, 72)}
               </div>
-              <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', marginTop: 10, maxWidth: 200 }}>
-                {['🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🦖', '🐉', '👻', '⚡️'].map(emoji => (
-                  <button
-                    key={emoji}
-                    onClick={() => {
-                      useProgressStore.setState((prev) => ({
-                        profiles: {
-                          ...prev.profiles,
-                          'default': {
-                            ...prev.profiles['default'],
-                            avatar: emoji
-                          }
-                        }
-                      }));
-                    }}
-                    style={{
-                      background: profile.avatar === emoji ? 'var(--bg-tertiary)' : 'none',
-                      border: profile.avatar === emoji ? '1px solid var(--accent-primary)' : '1px solid transparent',
-                      borderRadius: '50%',
-                      width: 28,
-                      height: 28,
-                      fontSize: 16,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: 0,
-                      transition: 'all 0.15s ease'
-                    }}
-                    title="Change avatar"
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
+              <button 
+                className="btn btn-secondary btn-sm" 
+                onClick={() => setAvatarModalOpen(true)}
+                style={{ marginTop: 10, padding: '4px 12px', fontSize: 12 }}
+              >
+                Edit Avatar
+              </button>
               <div className="profile-display-name">
                 {user?.displayName || profile.name}
               </div>
@@ -4054,6 +4168,13 @@ function ProfilePage({ user, syncStatus }) {
             )}
           </div>
         </div>
+        {avatarModalOpen && (
+          <AvatarEditorModal 
+            onClose={() => setAvatarModalOpen(false)} 
+            activeAvatar={profile.avatar} 
+            name={profile.name} 
+          />
+        )}
       </div>
     </div>
   );
