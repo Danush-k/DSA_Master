@@ -2507,25 +2507,25 @@ function AppLayout() {
   ) : false;
 
   useEffect(() => {
-    if (syncStatus !== 'loading') {
-      if (!isAuthenticated) {
-        if (location.pathname !== '/login') {
-          navigate('/login');
-        }
-      } else if (!isEmailVerified) {
-        if (location.pathname !== '/verify-email') {
-          navigate('/verify-email');
-        }
-      } else {
-        if (location.pathname === '/login' || location.pathname === '/verify-email') {
-          navigate('/');
-        }
+    // Don't navigate during loading or syncing — wait until cloud hydration is complete
+    if (syncStatus === 'loading' || syncStatus === 'syncing') return;
+    if (!isAuthenticated) {
+      if (location.pathname !== '/login') {
+        navigate('/login');
+      }
+    } else if (!isEmailVerified) {
+      if (location.pathname !== '/verify-email') {
+        navigate('/verify-email');
+      }
+    } else {
+      if (location.pathname === '/login' || location.pathname === '/verify-email') {
+        navigate('/');
       }
     }
   }, [syncStatus, isAuthenticated, isEmailVerified, location.pathname, navigate]);
 
-  // Loading Screen
-  if (syncStatus === 'loading') {
+  // Loading Screen — show while auth state is resolving OR while cloud data is being fetched
+  if (syncStatus === 'loading' || syncStatus === 'syncing') {
     return (
       <div className="lc-loading-screen">
         <div className="lc-loading-card">
@@ -2533,7 +2533,9 @@ function AppLayout() {
             <DsaMasteryLogo size={36} />
           </div>
           <h2 className="lc-loading-title">DSA Mastery</h2>
-          <div className="lc-loading-subtitle">Loading your workspace...</div>
+          <div className="lc-loading-subtitle">
+            {syncStatus === 'syncing' ? 'Syncing your progress...' : 'Loading your workspace...'}
+          </div>
           <div className="lc-spinner"></div>
         </div>
       </div>

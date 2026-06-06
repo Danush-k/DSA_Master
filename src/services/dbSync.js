@@ -82,19 +82,35 @@ export function initDbSync(onStatusChange) {
       }
     }
 
-    // 3. Sync profile metadata changes (avatar, name)
+    // 3. Sync profile metadata changes (avatar, name, streak, dailySolves, solveHistory)
     const allProfileKeys = Object.keys(state.profiles);
     for (const key of allProfileKeys) {
       const p = state.profiles[key];
       const prevP = prevState.profiles[key];
-      if (p && (p.name !== prevP?.name || p.avatar !== prevP?.avatar)) {
+      if (!p) continue;
+
+      const metaChanged =
+        p.name !== prevP?.name ||
+        p.avatar !== prevP?.avatar ||
+        p.currentStreak !== prevP?.currentStreak ||
+        p.longestStreak !== prevP?.longestStreak ||
+        p.lastSolveDate !== prevP?.lastSolveDate ||
+        JSON.stringify(p.dailySolves) !== JSON.stringify(prevP?.dailySolves) ||
+        JSON.stringify(p.solveHistory) !== JSON.stringify(prevP?.solveHistory);
+
+      if (metaChanged) {
         const docId = `${authUser.uid}_${key}`;
         await setDoc(doc(db, 'profiles', docId), {
           userId: authUser.uid,
           profileKey: key,
           name: p.name,
           avatar: p.avatar,
-          createdAt: new Date().toISOString()
+          currentStreak: p.currentStreak || 0,
+          longestStreak: p.longestStreak || 0,
+          lastSolveDate: p.lastSolveDate || null,
+          dailySolves: p.dailySolves || {},
+          solveHistory: (p.solveHistory || []).slice(0, 50),
+          updatedAt: new Date().toISOString()
         });
       }
     }
@@ -210,9 +226,28 @@ async function hydrateFromCloud(user) {
     const revisionsQuery = query(collection(db, 'user_revisions'), where('userId', '==', user.uid));
     const revisionsSnap = await getDocs(revisionsQuery);
 
-    const progressStoreState = { ...useProgressStore.getState() };
-    const notesStoreState = { ...useNotesStore.getState() };
-    const revisionStoreState = { ...useRevisionStore.getState() };
+    // Deep-clone current store states so React detects changes on setState
+    const currentProgress = useProgressStore.getState();
+    const progressStoreState = {
+      activeProfileId: currentProgress.activeProfileId,
+      profiles: Object.fromEntries(
+        Object.entries(currentProgress.profiles).map(([k, v]) => [k, { ...v, questionStatus: { ...v.questionStatus }, bookmarks: [...(v.bookmarks || []), ], dailySolves: { ...(v.dailySolves || {}) }, solveHistory: [...(v.solveHistory || [])] }])
+      )
+    };
+    const currentNotes = useNotesStore.getState();
+    const notesStoreState = {
+      ...currentNotes,
+      profiles: Object.fromEntries(
+        Object.entries(currentNotes.profiles).map(([k, v]) => [k, { ...v }])
+      )
+    };
+    const currentRevisions = useRevisionStore.getState();
+    const revisionStoreState = {
+      ...currentRevisions,
+      profiles: Object.fromEntries(
+        Object.entries(currentRevisions.profiles).map(([k, v]) => [k, { ...v }])
+      )
+    };
 
     // Initialize local stores based on dbProfiles
     if (profilesSnap.empty) {
@@ -224,9 +259,14 @@ async function hydrateFromCloud(user) {
         await setDoc(doc(db, 'profiles', docId), {
           userId: user.uid,
           profileKey: activeProfileId,
-          name: user.displayName || localProfile.name || 'Danush',
-          avatar: localProfile.avatar || '🦊',
-          createdAt: new Date().toISOString()
+          name: user.displayName || localProfile.name || 'User',
+          avatar: localProfile.avatar || '#FFA116',
+          currentStreak: localProfile.currentStreak || 0,
+          longestStreak: localProfile.longestStreak || 0,
+          lastSolveDate: localProfile.lastSolveDate || null,
+          dailySolves: localProfile.dailySolves || {},
+          solveHistory: (localProfile.solveHistory || []).slice(0, 50),
+          updatedAt: new Date().toISOString()
         });
       }
     } else {
@@ -238,16 +278,23 @@ async function hydrateFromCloud(user) {
             name: p.name,
             avatar: p.avatar,
             questionStatus: {},
-            dailySolves: {},
+            dailySolves: p.dailySolves || {},
             bookmarks: [],
-            currentStreak: 0,
-            longestStreak: 0,
-            lastSolveDate: null,
-            customQuestions: []
+            currentStreak: p.currentStreak || 0,
+            longestStreak: p.longestStreak || 0,
+            lastSolveDate: p.lastSolveDate || null,
+            customQuestions: [],
+            solveHistory: p.solveHistory || []
           };
         } else {
+          // Restore all profile metadata from cloud (authoritative source)
           progressStoreState.profiles[pk].name = p.name;
           progressStoreState.profiles[pk].avatar = p.avatar;
+          progressStoreState.profiles[pk].currentStreak = p.currentStreak || 0;
+          progressStoreState.profiles[pk].longestStreak = p.longestStreak || 0;
+          progressStoreState.profiles[pk].lastSolveDate = p.lastSolveDate || null;
+          progressStoreState.profiles[pk].dailySolves = p.dailySolves || {};
+          progressStoreState.profiles[pk].solveHistory = p.solveHistory || [];
         }
 
         if (!notesStoreState.profiles[pk]) notesStoreState.profiles[pk] = {};
@@ -255,7 +302,7 @@ async function hydrateFromCloud(user) {
       });
     }
 
-    // Hydrate progress
+    // Hydrate progress (questionStatus + bookmarks)
     progressSnap.forEach(docSnap => {
       const row = docSnap.data();
       const pk = row.profileKey;
@@ -328,10 +375,10 @@ async function hydrateFromCloud(user) {
       };
     });
 
-    // Set updated Zustand store states
-    useProgressStore.setState(progressStoreState);
-    useNotesStore.setState(notesStoreState);
-    useRevisionStore.setState(revisionStoreState);
+    // Set updated Zustand store states — new object references guarantee re-renders
+    useProgressStore.setState({ ...progressStoreState });
+    useNotesStore.setState({ ...notesStoreState });
+    useRevisionStore.setState({ ...revisionStoreState });
 
   } catch (err) {
     console.error("Hydration from Firebase Cloud failed:", err);
@@ -370,4 +417,3 @@ export function clearAllLocalStores() {
   localStorage.removeItem('dsa-notes-v2');
   localStorage.removeItem('dsa-revisions-v2');
 }
-
