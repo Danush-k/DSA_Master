@@ -3204,12 +3204,29 @@ function LoginPage({ user }) {
 
         let emailToSignIn = input;
         if (!input.includes('@')) {
+          // Primary: direct doc lookup by lowercase username key
           const userDocRef = doc(db, 'users', input.toLowerCase());
-          const userDoc = await getDoc(userDocRef);
+          let userDoc = await getDoc(userDocRef);
+
+          // Fallback: if doc not found by key, search by 'username' field
           if (!userDoc.exists()) {
-            throw new Error('User ID not found. Please register or use a valid email.');
+            const q = query(
+              collection(db, 'users'),
+              where('username', '==', input.toLowerCase())
+            );
+            const snap = await getDocs(q);
+            if (!snap.empty) {
+              userDoc = snap.docs[0];
+            }
+          }
+
+          if (!userDoc.exists()) {
+            throw new Error('Username not found. Check your username or sign in with your email address.');
           }
           emailToSignIn = userDoc.data().email;
+          if (!emailToSignIn) {
+            throw new Error('No email linked to this username. Please sign in with Google.');
+          }
         }
 
         await signInWithEmailAndPassword(auth, emailToSignIn, pass);
@@ -4286,6 +4303,24 @@ function PasswordSettingsModal({ onClose, user }) {
         // Link email/password credential to the Google account
         const credential = EmailAuthProvider.credential(user.email, newPassword);
         await linkWithCredential(user, credential);
+
+        // CRITICAL: Ensure the Firestore username doc exists so the user can
+        // sign in with username + password. Google-only accounts may not have one.
+        const username = (user.displayName || '').toLowerCase();
+        if (username) {
+          const userDocRef = doc(db, 'users', username);
+          const existing = await getDoc(userDocRef);
+          if (!existing.exists()) {
+            await setDoc(userDocRef, {
+              userId: user.uid,
+              username: username,
+              email: user.email || ''
+            });
+          } else if (!existing.data().email && user.email) {
+            // Patch email in case it was stored empty
+            await setDoc(userDocRef, { email: user.email }, { merge: true });
+          }
+        }
       } else {
         // Re-authenticate then change password
         if (!currentPassword) {
