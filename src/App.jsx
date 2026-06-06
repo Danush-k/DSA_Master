@@ -58,6 +58,46 @@ const LeetCodeLogo = ({ size = 14 }) => (
   </svg>
 );
 
+// DSA Mastery professional custom logo
+const DsaMasteryLogo = ({ size = 24, className = "" }) => (
+  <svg
+    viewBox="0 0 100 100"
+    width={size}
+    height={size}
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <defs>
+      <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#FFA116" />
+        <stop offset="100%" stopColor="#FF7A00" />
+      </linearGradient>
+    </defs>
+    {/* Inner stylized D representing Data Structures & DSA */}
+    <path
+      d="M35 25 H55 C70 25, 75 35, 75 50 C75 65, 70 75, 55 75 H35 V25 Z"
+      fill="none"
+      stroke="url(#logo-grad)"
+      strokeWidth="8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M48 25 V75"
+      stroke="url(#logo-grad)"
+      strokeWidth="6"
+      strokeLinecap="round"
+    />
+    {/* Graph Nodes representing structures and connections */}
+    <circle cx="35" cy="25" r="5.5" fill="#FFA116" />
+    <circle cx="55" cy="25" r="5.5" fill="#FF7A00" />
+    <circle cx="72" cy="50" r="5.5" fill="#FFA116" />
+    <circle cx="55" cy="75" r="5.5" fill="#FF7A00" />
+    <circle cx="35" cy="75" r="5.5" fill="#FFA116" />
+    <circle cx="48" cy="50" r="4.5" fill="#FFFFFF" />
+  </svg>
+);
+
 const getAvatarColor = (avatarValue, name = 'Default') => {
   if (avatarValue && avatarValue.startsWith('#')) return avatarValue;
   const colors = [
@@ -329,7 +369,7 @@ function Sidebar({ isOpen, onClose }) {
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-logo">
           <div className="sidebar-logo-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <LeetCodeLogo size={20} />
+            <DsaMasteryLogo size={20} />
           </div>
           <span className="sidebar-logo-text">DSA Mastery</span>
         </div>
@@ -2441,7 +2481,7 @@ function AppLayout() {
       <div className="lc-loading-screen">
         <div className="lc-loading-card">
           <div className="lc-logo-circle spin-glow" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <LeetCodeLogo size={36} />
+            <DsaMasteryLogo size={36} />
           </div>
           <h2 className="lc-loading-title">DSA Mastery</h2>
           <div className="lc-loading-subtitle">Loading your workspace...</div>
@@ -3243,7 +3283,7 @@ function LoginPage({ user }) {
         <div className="lc-login-card">
           <div className="lc-login-header">
             <div className="lc-logo-circle" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <LeetCodeLogo size={36} />
+              <DsaMasteryLogo size={36} />
             </div>
             <h2 className="lc-login-title">Choose User ID</h2>
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', margin: '8px 0', lineHeight: 1.5 }}>
@@ -3299,7 +3339,7 @@ function LoginPage({ user }) {
       <div className="lc-login-card">
         <div className="lc-login-header">
           <div className="lc-logo-circle" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <LeetCodeLogo size={36} />
+            <DsaMasteryLogo size={36} />
           </div>
           <h2 className="lc-login-title">
             {mode === 'forgot' ? 'Reset Password' : 'DSA Mastery'}
