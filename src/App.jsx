@@ -68,52 +68,53 @@ const DsaMasteryLogo = ({ size = 24, className = "" }) => (
     xmlns="http://www.w3.org/2000/svg"
   >
     <defs>
-      <linearGradient id="shield-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#38BDF8" />
-        <stop offset="100%" stopColor="#0284C7" />
-      </linearGradient>
-      <linearGradient id="node-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
         <stop offset="0%" stopColor="#FFA116" />
-        <stop offset="100%" stopColor="#FF7A00" />
+        <stop offset="100%" stopColor="#FF5A00" />
       </linearGradient>
     </defs>
-    
-    {/* Tech Hexagonal Border representing algorithmic structure */}
+    {/* Outer hexagonal contour, sleek and thin */}
     <polygon
-      points="50,8 88,28 88,72 50,92 12,72 12,28"
+      points="50,6 92,30 92,70 50,94 8,70 8,30"
       fill="none"
-      stroke="url(#shield-grad)"
-      strokeWidth="5"
-      strokeLinejoin="round"
-      opacity="0.8"
+      stroke="url(#logo-gradient)"
+      strokeWidth="2.5"
+      strokeOpacity="0.3"
     />
-    
-    {/* Inner stylized network / tree structure forming a trophy or crown shape */}
-    {/* Root Node */}
-    <circle cx="50" cy="28" r="6" fill="url(#node-grad)" />
-    
-    {/* Level 1 Left/Right */}
-    <circle cx="32" cy="48" r="5" fill="url(#node-grad)" />
-    <circle cx="68" cy="48" r="5" fill="url(#node-grad)" />
-    
-    {/* Level 2 Nodes */}
-    <circle cx="22" cy="68" r="4.5" fill="url(#node-grad)" />
-    <circle cx="42" cy="68" r="4.5" fill="url(#node-grad)" />
-    <circle cx="58" cy="68" r="4.5" fill="url(#node-grad)" />
-    <circle cx="78" cy="68" r="4.5" fill="url(#node-grad)" />
-    
-    {/* Network Lines */}
-    <line x1="50" y1="28" x2="32" y2="48" stroke="var(--text-primary)" strokeWidth="2.5" opacity="0.7" />
-    <line x1="50" y1="28" x2="68" y2="48" stroke="var(--text-primary)" strokeWidth="2.5" opacity="0.7" />
-    
-    <line x1="32" y1="48" x2="22" y2="68" stroke="var(--text-primary)" strokeWidth="2" opacity="0.6" />
-    <line x1="32" y1="48" x2="42" y2="68" stroke="var(--text-primary)" strokeWidth="2" opacity="0.6" />
-    <line x1="68" y1="48" x2="58" y2="68" stroke="var(--text-primary)" strokeWidth="2" opacity="0.6" />
-    <line x1="68" y1="48" x2="78" y2="68" stroke="var(--text-primary)" strokeWidth="2" opacity="0.6" />
-    
-    {/* Master check Connection */}
-    <circle cx="50" cy="52" r="8" fill="none" stroke="#FFA116" strokeWidth="2" strokeDasharray="3,3" />
-    <path d="M47 52 L49 54 L53 50" fill="none" stroke="#FFA116" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    {/* Styled interlocking code brackets forming a 3D isometric cube/node */}
+    {/* Left Bracket / Side */}
+    <path
+      d="M44 22 L22 35 L22 65 L44 78"
+      fill="none"
+      stroke="url(#logo-gradient)"
+      strokeWidth="7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    {/* Right Bracket / Side */}
+    <path
+      d="M56 22 L78 35 L78 65 L56 78"
+      fill="none"
+      stroke="url(#logo-gradient)"
+      strokeWidth="7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    {/* Middle connection node - clean and glowing */}
+    <line
+      x1="30"
+      y1="50"
+      x2="70"
+      y2="50"
+      stroke="url(#logo-gradient)"
+      strokeWidth="5"
+      strokeLinecap="round"
+      strokeDasharray="0.1, 12"
+      strokeOpacity="0.8"
+    />
+    {/* Central core node */}
+    <circle cx="50" cy="50" r="7.5" fill="url(#logo-gradient)" />
+    <circle cx="50" cy="50" r="3" fill="#ffffff" />
   </svg>
 );
 
