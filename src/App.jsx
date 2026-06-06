@@ -3445,7 +3445,7 @@ function LoginPage({ user }) {
           {mode === 'signup' ? (
             <>
               <div className="lc-input-group">
-                <label>User ID (Permanent)</label>
+                <label>Username <span style={{ fontWeight: 400, color: 'var(--text-tertiary)', fontSize: 11 }}>(can be changed later in Profile)</span></label>
                 <input
                   type="text"
                   placeholder="Letters, numbers, underscores or hyphens"
