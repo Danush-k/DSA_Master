@@ -68,53 +68,60 @@ const DsaMasteryLogo = ({ size = 24, className = "" }) => (
     xmlns="http://www.w3.org/2000/svg"
   >
     <defs>
-      <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <linearGradient id="logo-grad-front" x1="0%" y1="0%" x2="100%" y2="100%">
         <stop offset="0%" stopColor="#FFA116" />
-        <stop offset="100%" stopColor="#FF5A00" />
+        <stop offset="100%" stopColor="#FF7A00" />
       </linearGradient>
+      <linearGradient id="logo-grad-back" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#FF5A00" />
+        <stop offset="100%" stopColor="#C23B00" />
+      </linearGradient>
+      <filter id="logo-shadow" x="-10%" y="-10%" width="120%" height="120%">
+        <feDropShadow dx="-2" dy="4" stdDeviation="3" floodColor="#000000" floodOpacity="0.4" />
+      </filter>
     </defs>
-    {/* Outer hexagonal contour, sleek and thin */}
+    {/* Background isometric fold */}
     <polygon
-      points="50,6 92,30 92,70 50,94 8,70 8,30"
-      fill="none"
-      stroke="url(#logo-gradient)"
-      strokeWidth="2.5"
-      strokeOpacity="0.3"
+      points="50,12 85,32 85,72 50,92"
+      fill="url(#logo-grad-back)"
     />
-    {/* Styled interlocking code brackets forming a 3D isometric cube/node */}
-    {/* Left Bracket / Side */}
+    {/* Foreground overlapping isometric fold creating depth */}
+    <polygon
+      points="50,12 15,32 15,72 50,92"
+      fill="url(#logo-grad-front)"
+      filter="url(#logo-shadow)"
+    />
+    {/* Stylized code brackets cutting through the isometric fold */}
     <path
-      d="M44 22 L22 35 L22 65 L44 78"
+      d="M38,40 L28,50 L38,60"
       fill="none"
-      stroke="url(#logo-gradient)"
-      strokeWidth="7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    {/* Right Bracket / Side */}
-    <path
-      d="M56 22 L78 35 L78 65 L56 78"
-      fill="none"
-      stroke="url(#logo-gradient)"
-      strokeWidth="7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    {/* Middle connection node - clean and glowing */}
-    <line
-      x1="30"
-      y1="50"
-      x2="70"
-      y2="50"
-      stroke="url(#logo-gradient)"
+      stroke="#ffffff"
       strokeWidth="5"
       strokeLinecap="round"
-      strokeDasharray="0.1, 12"
-      strokeOpacity="0.8"
+      strokeLinejoin="round"
+      opacity="0.95"
     />
-    {/* Central core node */}
-    <circle cx="50" cy="50" r="7.5" fill="url(#logo-gradient)" />
-    <circle cx="50" cy="50" r="3" fill="#ffffff" />
+    <path
+      d="M62,40 L72,50 L62,60"
+      fill="none"
+      stroke="#ffffff"
+      strokeWidth="5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      opacity="0.95"
+    />
+    {/* Central connection point */}
+    <line
+      x1="38"
+      y1="50"
+      x2="62"
+      y2="50"
+      stroke="#ffffff"
+      strokeWidth="4"
+      strokeDasharray="1, 8"
+      strokeLinecap="round"
+      opacity="0.85"
+    />
   </svg>
 );
 
