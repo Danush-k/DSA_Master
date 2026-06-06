@@ -344,7 +344,7 @@ async function hydrateFromCloud(user) {
 export async function deleteUserCloudData(user) {
   if (!db || !user) return;
   
-  const collections = ['profiles', 'user_progress', 'user_notes', 'user_revisions', 'custom_questions'];
+  const collections = ['users', 'profiles', 'user_progress', 'user_notes', 'user_revisions', 'custom_questions'];
   
   for (const collName of collections) {
     try {

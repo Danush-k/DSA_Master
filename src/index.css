@@ -2851,7 +2851,7 @@ input:focus, textarea:focus, select:focus {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   SIGN OUT OVERLAY
+   SIGN OUT OVERLAY & DANGER ZONE
    ═══════════════════════════════════════════════════════════════ */
 
 .signout-overlay {
