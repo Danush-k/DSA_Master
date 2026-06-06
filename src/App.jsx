@@ -80,6 +80,25 @@ const getAvatarColor = (avatarValue, name = 'Default') => {
 };
 
 const renderAvatar = (avatarValue, name = 'Default', size = 20) => {
+  const isEmoji = avatarValue && !avatarValue.startsWith('#') && avatarValue.length <= 4;
+  if (isEmoji) {
+    return (
+      <div 
+        style={{
+          width: size,
+          height: size,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: Math.max(12, Math.floor(size * 0.65)),
+          lineHeight: 1,
+          flexShrink: 0
+        }}
+      >
+        {avatarValue}
+      </div>
+    );
+  }
   const color = getAvatarColor(avatarValue, name);
   const initial = name ? name.trim().charAt(0).toUpperCase() : 'D';
   return (
@@ -3729,6 +3748,41 @@ function ProfilePage({ user, syncStatus }) {
             <div className="profile-user-info">
               <div className="profile-avatar-large">
                 {renderAvatar(profile.avatar, profile.name, 72)}
+              </div>
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', marginTop: 10, maxWidth: 200 }}>
+                {['🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🦖', '🐉', '👻', '⚡️'].map(emoji => (
+                  <button
+                    key={emoji}
+                    onClick={() => {
+                      useProgressStore.setState((prev) => ({
+                        profiles: {
+                          ...prev.profiles,
+                          'default': {
+                            ...prev.profiles['default'],
+                            avatar: emoji
+                          }
+                        }
+                      }));
+                    }}
+                    style={{
+                      background: profile.avatar === emoji ? 'var(--bg-tertiary)' : 'none',
+                      border: profile.avatar === emoji ? '1px solid var(--accent-primary)' : '1px solid transparent',
+                      borderRadius: '50%',
+                      width: 28,
+                      height: 28,
+                      fontSize: 16,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 0,
+                      transition: 'all 0.15s ease'
+                    }}
+                    title="Change avatar"
+                  >
+                    {emoji}
+                  </button>
+                ))}
               </div>
               <div className="profile-display-name">
                 {user?.displayName || profile.name}
