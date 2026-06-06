@@ -2408,6 +2408,21 @@ function AppLayout() {
 
   const [syncStatus, setSyncStatus] = useState('loading'); // 'loading', 'unauthenticated', 'syncing', 'synced'
   const [user, setUser] = useState(null);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  const handleLogoutGlobal = async () => {
+    setIsSigningOut(true);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      await signOut(auth);
+      clearAllLocalStores();
+      navigate('/');
+    } catch (err) {
+      console.error("Logout failed:", err);
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
 
   // Initialize DB Sync
   useEffect(() => {
@@ -2526,6 +2541,7 @@ function AppLayout() {
           <Route path="/login" element={<LoginPage user={user} />} />
           <Route path="*" element={<LoginPage user={user} />} />
         </Routes>
+        {isSigningOut && <SignOutOverlay />}
       </div>
     );
   }
@@ -2535,9 +2551,10 @@ function AppLayout() {
     return (
       <div className="app-layout auth-only">
         <Routes>
-          <Route path="/verify-email" element={<VerifyEmailPage user={user} />} />
-          <Route path="*" element={<VerifyEmailPage user={user} />} />
+          <Route path="/verify-email" element={<VerifyEmailPage user={user} onLogout={handleLogoutGlobal} />} />
+          <Route path="*" element={<VerifyEmailPage user={user} onLogout={handleLogoutGlobal} />} />
         </Routes>
+        {isSigningOut && <SignOutOverlay />}
       </div>
     );
   }
@@ -2565,10 +2582,11 @@ function AppLayout() {
           <Route path="/patterns/:patternId" element={<PatternDetailPage />} />
           <Route path="/revision" element={<RevisionPage />} />
           <Route path="/bookmarks" element={<BookmarksPage />} />
-          <Route path="/profile" element={<ProfilePage user={user} syncStatus={syncStatus} />} />
+          <Route path="/profile" element={<ProfilePage user={user} syncStatus={syncStatus} onLogout={handleLogoutGlobal} />} />
           <Route path="*" element={<DashboardPage />} />
         </Routes>
       </div>
+      {isSigningOut && <SignOutOverlay />}
     </div>
   );
 }
@@ -3535,7 +3553,7 @@ function LoginPage({ user }) {
 // ═══════════════════════════════════════════════════════════════
 // EMAIL VERIFICATION PAGE
 // ═══════════════════════════════════════════════════════════════
-function VerifyEmailPage({ user }) {
+function VerifyEmailPage({ user, onLogout }) {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -3584,6 +3602,10 @@ function VerifyEmailPage({ user }) {
   };
 
   const handleLogout = async () => {
+    if (onLogout) {
+      await onLogout();
+      return;
+    }
     try {
       await signOut(auth);
       clearAllLocalStores();
@@ -3799,9 +3821,24 @@ function AvatarEditorModal({ onClose, activeAvatar, name }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// SIGN OUT OVERLAY
+// ═══════════════════════════════════════════════════════════════
+function SignOutOverlay() {
+  return (
+    <div className="signout-overlay">
+      <div className="signout-card">
+        <RefreshCw className="spin signout-spinner" size={40} />
+        <h3>Signing out of DSA Mastery</h3>
+        <p>Securing your workspace and syncing records...</p>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // LEETCODE-STYLE PROFILE PAGE
 // ═══════════════════════════════════════════════════════════════
-function ProfilePage({ user, syncStatus }) {
+function ProfilePage({ user, syncStatus, onLogout }) {
   const navigate = useNavigate();
   const allQuestions = useAllQuestions();
   const activeProfileId = useProgressStore((s) => s.activeProfileId);
@@ -3884,12 +3921,16 @@ function ProfilePage({ user, syncStatus }) {
 
   // Sign out helper
   const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      clearAllLocalStores();
-      navigate('/');
-    } catch (err) {
-      console.error(err);
+    if (onLogout) {
+      await onLogout();
+    } else {
+      try {
+        await signOut(auth);
+        clearAllLocalStores();
+        navigate('/');
+      } catch (err) {
+        console.error(err);
+      }
     }
   };
 
