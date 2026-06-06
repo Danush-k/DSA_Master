@@ -11,7 +11,7 @@ import {
   Cloud, CloudOff, RefreshCw, User, Map, Settings, Download, Upload, LogOut, Trash2,
   AlertCircle, Mail, Trophy, AlertTriangle
 } from 'lucide-react';
-import { auth } from './firebaseClient.js';
+import { auth, db } from './firebaseClient.js';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -21,8 +21,18 @@ import {
   deleteUser,
   sendPasswordResetEmail,
   sendEmailVerification,
-  linkWithPopup
+  linkWithPopup,
+  updateProfile
 } from 'firebase/auth';
+import {
+  doc,
+  getDoc,
+  setDoc,
+  getDocs,
+  collection,
+  query,
+  where
+} from 'firebase/firestore';
 import { initDbSync, deleteUserCloudData, clearAllLocalStores } from './services/dbSync.js';
 
 // Custom Youtube SVG Icon since brand icons are not exported in this lucide-react version
@@ -415,22 +425,11 @@ function Header({ title, onMenuClick, onManageProfiles, syncStatus, user, onAuth
           </button>
           {profileDropdownOpen && (
             <div className="profile-dropdown">
-              <div className="profile-dropdown-header">Profiles</div>
-              {Object.entries(profiles).map(([id, p]) => (
-                <button
-                  key={id}
-                  className={`profile-dropdown-item ${id === activeProfileId ? 'active' : ''}`}
-                  onClick={() => {
-                    switchProfile(id);
-                    setProfileDropdownOpen(false);
-                  }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8 }}
-                >
-                  {renderAvatar(p.avatar, p.name, 18)}
-                  <span style={{ flex: 1, textAlign: 'left' }}>{p.name}</span>
-                  {id === activeProfileId && <Check size={14} className="active-check" />}
-                </button>
-              ))}
+              <div className="profile-dropdown-header">Logged in as</div>
+              <div className="profile-dropdown-item active" style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'default' }}>
+                {renderAvatar(activeProfile?.avatar, activeProfile?.name, 18)}
+                <span style={{ flex: 1, textAlign: 'left', fontWeight: 600 }}>{activeProfile?.name || 'Default'}</span>
+              </div>
               <div className="profile-dropdown-divider" />
               <Link
                 to="/profile"
@@ -440,16 +439,6 @@ function Header({ title, onMenuClick, onManageProfiles, syncStatus, user, onAuth
               >
                 <User size={14} /> View Profile Page
               </Link>
-              <button
-                className="profile-dropdown-item"
-                onClick={() => {
-                  onManageProfiles();
-                  setProfileDropdownOpen(false);
-                }}
-                style={{ display: 'flex', alignItems: 'center', gap: 8 }}
-              >
-                <Settings size={14} /> Manage Profiles
-              </button>
             </div>
           )}
         </div>
@@ -2348,22 +2337,31 @@ function AppLayout() {
     switchRevisionProfile(activeProfileId);
   }, [activeProfileId, switchNotesProfile, switchRevisionProfile]);
 
-  // Ensure 'default' profile is automatically renamed to 'Danush' for existing users
+  // Ensure the default profile name is kept in sync with the user's permanent User ID (displayName)
   useEffect(() => {
     const progressStore = useProgressStore.getState();
-    if (progressStore.profiles['default'] && progressStore.profiles['default'].name === 'Default Profile') {
-      useProgressStore.setState((prev) => ({
-        profiles: {
-          ...prev.profiles,
-          'default': {
-            ...prev.profiles['default'],
-            name: 'Danush',
-            avatar: '🦊'
-          }
-        }
-      }));
+    
+    // Enforce default profile key
+    if (progressStore.activeProfileId !== 'default') {
+      useProgressStore.getState().switchProfile('default');
     }
-  }, []);
+
+    if (user && user.displayName) {
+      const currentName = progressStore.profiles['default']?.name;
+      if (currentName !== user.displayName) {
+        useProgressStore.setState((prev) => ({
+          profiles: {
+            ...prev.profiles,
+            'default': {
+              ...prev.profiles['default'],
+              name: user.displayName,
+              avatar: prev.profiles['default']?.avatar || '#FFA116'
+            }
+          }
+        }));
+      }
+    }
+  }, [user]);
 
   const getPageTitle = () => {
     if (location.pathname === '/') return 'Dashboard';
@@ -2485,7 +2483,6 @@ function AppLayout() {
           <Route path="*" element={<DashboardPage />} />
         </Routes>
       </div>
-      {managerOpen && <ProfileManagerModal onClose={() => setManagerOpen(false)} />}
     </div>
   );
 }
@@ -2956,44 +2953,162 @@ function LoginPage({ user }) {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      const isEmailVerified = user.emailVerified || 
-        user.email?.endsWith('@dsamastery.local') || 
-        user.providerData.some(p => p.providerId === 'google.com');
-      if (isEmailVerified) {
-        navigate('/');
+  // New state variables for User ID mapping
+  const [checkingUserId, setCheckingUserId] = useState(false);
+  const [needsUserId, setNeedsUserId] = useState(false);
+  const [newUserId, setNewUserId] = useState('');
+  const [userIdForSignup, setUserIdForSignup] = useState('');
+  const [emailForSignup, setEmailForSignup] = useState('');
+
+  const checkUserMapping = async (currentUser) => {
+    if (!currentUser) return;
+    setCheckingUserId(true);
+    try {
+      const q = query(collection(db, 'users'), where('userId', '==', currentUser.uid));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const userDoc = snap.docs[0].data();
+        const mappedUsername = userDoc.username;
+        
+        if (currentUser.displayName !== mappedUsername) {
+          await updateProfile(currentUser, { displayName: mappedUsername });
+        }
+        
+        const progressStore = useProgressStore.getState();
+        if (progressStore.profiles['default'] && progressStore.profiles['default'].name !== mappedUsername) {
+          useProgressStore.setState((prev) => ({
+            profiles: {
+              ...prev.profiles,
+              'default': {
+                ...prev.profiles['default'],
+                name: mappedUsername
+              }
+            }
+          }));
+        }
+
+        const isEmailVerified = currentUser.emailVerified || 
+          currentUser.email?.endsWith('@dsamastery.local') || 
+          currentUser.providerData.some(p => p.providerId === 'google.com');
+        if (isEmailVerified) {
+          navigate('/');
+        } else {
+          navigate('/verify-email');
+        }
       } else {
-        navigate('/verify-email');
+        // Migration for legacy user with local dsamastery.local emails
+        if (currentUser.email && currentUser.email.endsWith('@dsamastery.local')) {
+          const legacyUsername = currentUser.email.split('@')[0];
+          await setDoc(doc(db, 'users', legacyUsername.toLowerCase()), {
+            userId: currentUser.uid,
+            username: legacyUsername,
+            email: currentUser.email
+          });
+          await updateProfile(currentUser, { displayName: legacyUsername });
+          navigate('/');
+          return;
+        }
+        
+        setNeedsUserId(true);
       }
+    } catch (err) {
+      console.error(err);
+      setError('Failed to check user account setup: ' + err.message);
+    } finally {
+      setCheckingUserId(false);
     }
-  }, [user, navigate]);
+  };
+
+  useEffect(() => {
+    if (user && !needsUserId) {
+      checkUserMapping(user);
+    }
+  }, [user, needsUserId, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
-    if (!usernameOrEmail.trim()) return;
-    if (mode !== 'forgot' && !password.trim()) return;
-
-    const formattedEmail = usernameOrEmail.includes('@')
-      ? usernameOrEmail.trim()
-      : `${usernameOrEmail.trim().toLowerCase()}@dsamastery.local`;
-
     setLoading(true);
+
     try {
       if (mode === 'signup') {
-        const userCredential = await createUserWithEmailAndPassword(auth, formattedEmail, password.trim());
-        if (!formattedEmail.endsWith('@dsamastery.local')) {
-          await sendEmailVerification(userCredential.user);
+        const uId = userIdForSignup.trim();
+        const email = emailForSignup.trim();
+        const pass = password.trim();
+
+        if (!uId || !email || !pass) {
+          throw new Error('Please fill in all fields.');
+        }
+
+        const userIdRegex = /^[a-zA-Z0-9_-]+$/;
+        if (!userIdRegex.test(uId)) {
+          throw new Error('User ID can only contain letters, numbers, underscores, or hyphens.');
+        }
+        if (uId.length < 3) {
+          throw new Error('User ID must be at least 3 characters long.');
+        }
+        if (uId.includes('@')) {
+          throw new Error('User ID cannot contain the "@" symbol.');
+        }
+
+        const userDocRef = doc(db, 'users', uId.toLowerCase());
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          throw new Error('This User ID is already taken.');
+        }
+
+        const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+        const firebaseUser = userCredential.user;
+
+        await setDoc(userDocRef, {
+          userId: firebaseUser.uid,
+          username: uId,
+          email: email
+        });
+
+        await updateProfile(firebaseUser, { displayName: uId });
+
+        const progressStore = useProgressStore.getState();
+        if (progressStore.profiles['default']) {
+          useProgressStore.setState((prev) => ({
+            profiles: {
+              ...prev.profiles,
+              'default': {
+                ...prev.profiles['default'],
+                name: uId
+              }
+            }
+          }));
+        }
+
+        if (!email.endsWith('@dsamastery.local')) {
+          await sendEmailVerification(firebaseUser);
         }
       } else if (mode === 'signin') {
-        await signInWithEmailAndPassword(auth, formattedEmail, password.trim());
+        const input = usernameOrEmail.trim();
+        const pass = password.trim();
+
+        if (!input || !pass) return;
+
+        let emailToSignIn = input;
+        if (!input.includes('@')) {
+          const userDocRef = doc(db, 'users', input.toLowerCase());
+          const userDoc = await getDoc(userDocRef);
+          if (!userDoc.exists()) {
+            throw new Error('User ID not found. Please register or use a valid email.');
+          }
+          emailToSignIn = userDoc.data().email;
+        }
+
+        await signInWithEmailAndPassword(auth, emailToSignIn, pass);
       } else if (mode === 'forgot') {
-        if (!usernameOrEmail.includes('@')) {
+        const input = usernameOrEmail.trim();
+        if (!input) return;
+        if (!input.includes('@')) {
           throw new Error('Password reset is only supported for accounts registered with a real email address.');
         }
-        await sendPasswordResetEmail(auth, usernameOrEmail.trim());
+        await sendPasswordResetEmail(auth, input);
         setSuccess('Password reset link has been sent to your email.');
       }
     } catch (err) {
@@ -3001,9 +3116,75 @@ function LoginPage({ user }) {
       let errMsg = err.message;
       if (err.code === 'auth/wrong-password') errMsg = 'Incorrect password.';
       if (err.code === 'auth/user-not-found') errMsg = 'User not found.';
-      if (err.code === 'auth/email-already-in-use') errMsg = 'This username or email is already taken.';
+      if (err.code === 'auth/email-already-in-use') errMsg = 'This email is already in use.';
       if (err.code === 'auth/invalid-credential') errMsg = 'Invalid credentials.';
       setError(errMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSetUserId = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    const uId = newUserId.trim();
+    if (!uId) return;
+
+    const userIdRegex = /^[a-zA-Z0-9_-]+$/;
+    if (!userIdRegex.test(uId)) {
+      setError('User ID can only contain letters, numbers, underscores, or hyphens.');
+      return;
+    }
+    if (uId.length < 3) {
+      setError('User ID must be at least 3 characters long.');
+      return;
+    }
+    if (uId.includes('@')) {
+      setError('User ID cannot contain the "@" symbol.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const userDocRef = doc(db, 'users', uId.toLowerCase());
+      const userDoc = await getDoc(userDocRef);
+      if (userDoc.exists()) {
+        throw new Error('This User ID is already taken.');
+      }
+
+      if (!auth.currentUser) {
+        throw new Error('No logged-in user session found.');
+      }
+
+      const firebaseUser = auth.currentUser;
+
+      await setDoc(userDocRef, {
+        userId: firebaseUser.uid,
+        username: uId,
+        email: firebaseUser.email
+      });
+
+      await updateProfile(firebaseUser, { displayName: uId });
+
+      const progressStore = useProgressStore.getState();
+      if (progressStore.profiles['default']) {
+        useProgressStore.setState((prev) => ({
+          profiles: {
+            ...prev.profiles,
+            'default': {
+              ...prev.profiles['default'],
+              name: uId
+            }
+          }
+        }));
+      }
+
+      setNeedsUserId(false);
+      navigate('/');
+    } catch (err) {
+      console.error(err);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -3025,6 +3206,74 @@ function LoginPage({ user }) {
       setLoading(false);
     }
   };
+
+  if (checkingUserId) {
+    return (
+      <div className="lc-login-container">
+        <div className="lc-login-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }}>
+          <RefreshCw className="spin" size={36} color="var(--accent-primary)" />
+          <p style={{ marginTop: 16, fontSize: 14, color: 'var(--text-secondary)' }}>Checking account setup...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (needsUserId) {
+    return (
+      <div className="lc-login-container">
+        <div className="lc-login-card">
+          <div className="lc-login-header">
+            <div className="lc-logo-circle" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <LeetCodeLogo size={36} />
+            </div>
+            <h2 className="lc-login-title">Choose User ID</h2>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', margin: '8px 0', lineHeight: 1.5 }}>
+              Choose a permanent User ID to complete your registration. This cannot be changed later.
+            </p>
+          </div>
+
+          {error && (
+            <div style={{
+              padding: '10px 12px', background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 'var(--radius-md)',
+              color: 'var(--error)', fontSize: 13, lineHeight: 1.4, textAlign: 'center', marginBottom: 12
+            }}>
+              <AlertTriangle size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSetUserId} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="lc-input-group">
+              <label>User ID (Permanent)</label>
+              <input
+                type="text"
+                placeholder="e.g. danush"
+                value={newUserId}
+                onChange={e => setNewUserId(e.target.value)}
+                required
+                className="lc-input"
+              />
+            </div>
+            <button type="submit" className="lc-submit-btn" disabled={loading}>
+              {loading ? 'Setting User ID...' : 'Confirm User ID'}
+            </button>
+            <button 
+              type="button" 
+              className="lc-google-btn" 
+              onClick={() => {
+                signOut(auth);
+                setNeedsUserId(false);
+                setError('');
+              }}
+              style={{ border: '1px solid var(--border-secondary)', background: 'var(--bg-tertiary)', marginTop: 4 }}
+            >
+              Cancel & Sign Out
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="lc-login-container">
@@ -3065,7 +3314,7 @@ function LoginPage({ user }) {
           <div style={{
             padding: '10px 12px', background: 'rgba(239, 68, 68, 0.1)',
             border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 'var(--radius-md)',
-            color: 'var(--error)', fontSize: 13, lineHeight: 1.4, textAlign: 'center'
+            color: 'var(--error)', fontSize: 13, lineHeight: 1.4, textAlign: 'center', marginBottom: 12
           }}>
             <AlertTriangle size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> {error}
           </div>
@@ -3075,24 +3324,51 @@ function LoginPage({ user }) {
           <div style={{
             padding: '10px 12px', background: 'rgba(0, 184, 163, 0.1)',
             border: '1px solid rgba(0, 184, 163, 0.2)', borderRadius: 'var(--radius-md)',
-            color: 'var(--success)', fontSize: 13, lineHeight: 1.4, textAlign: 'center'
+            color: 'var(--success)', fontSize: 13, lineHeight: 1.4, textAlign: 'center', marginBottom: 12
           }}>
             <Check size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} color="var(--success)" /> {success}
           </div>
         )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="lc-input-group">
-            <label>Username or Email</label>
-            <input
-              type="text"
-              placeholder="Username or email address"
-              value={usernameOrEmail}
-              onChange={e => setUsernameOrEmail(e.target.value)}
-              required
-              className="lc-input"
-            />
-          </div>
+          {mode === 'signup' ? (
+            <>
+              <div className="lc-input-group">
+                <label>User ID (Permanent)</label>
+                <input
+                  type="text"
+                  placeholder="Letters, numbers, underscores or hyphens"
+                  value={userIdForSignup}
+                  onChange={e => setUserIdForSignup(e.target.value)}
+                  required
+                  className="lc-input"
+                />
+              </div>
+              <div className="lc-input-group">
+                <label>Email Address</label>
+                <input
+                  type="email"
+                  placeholder="Email address"
+                  value={emailForSignup}
+                  onChange={e => setEmailForSignup(e.target.value)}
+                  required
+                  className="lc-input"
+                />
+              </div>
+            </>
+          ) : (
+            <div className="lc-input-group">
+              <label>{mode === 'forgot' ? 'Email Address' : 'User ID or Email'}</label>
+              <input
+                type="text"
+                placeholder={mode === 'forgot' ? 'Email address' : 'User ID or email address'}
+                value={usernameOrEmail}
+                onChange={e => setUsernameOrEmail(e.target.value)}
+                required
+                className="lc-input"
+              />
+            </div>
+          )}
 
           {mode !== 'forgot' && (
             <div className="lc-input-group">
@@ -3481,9 +3757,6 @@ function ProfilePage({ user, syncStatus }) {
             <h4 style={{ fontSize: 14, fontWeight: 700, borderBottom: '1px solid var(--border-primary)', paddingBottom: 8 }}>
               Account Settings
             </h4>
-            <button className="btn btn-secondary btn-sm" onClick={() => setManagerOpen(true)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <Settings size={14} /> Switch/Manage Profile
-            </button>
             <button className="btn btn-secondary btn-sm" onClick={handleBackup} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <Download size={14} /> Backup Data (JSON)
             </button>
@@ -3688,7 +3961,6 @@ function ProfilePage({ user, syncStatus }) {
           </div>
         </div>
       </div>
-      {managerOpen && <ProfileManagerModal onClose={() => setManagerOpen(false)} />}
     </div>
   );
 }
