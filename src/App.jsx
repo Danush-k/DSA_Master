@@ -9,7 +9,7 @@ import {
   ArrowUpDown, Binary, ChevronsLeftRight, Columns, GitBranch, Grid, Hash, Layers,
   Link as LinkIcon, Network, Sparkles, Star, TrendingUp, Type, Zap,
   Cloud, CloudOff, RefreshCw, User, Map, Settings, Download, Upload, LogOut, Trash2,
-  AlertCircle, Mail, Trophy, AlertTriangle
+  AlertCircle, Mail, Trophy, AlertTriangle, Key, Pencil
 } from 'lucide-react';
 import { auth, db } from './firebaseClient.js';
 import {
@@ -25,7 +25,10 @@ import {
   updateProfile,
   reauthenticateWithCredential,
   EmailAuthProvider,
-  reauthenticateWithPopup
+  reauthenticateWithPopup,
+  updatePassword,
+  linkWithCredential,
+  fetchSignInMethodsForEmail
 } from 'firebase/auth';
 import {
   doc,
@@ -34,7 +37,8 @@ import {
   getDocs,
   collection,
   query,
-  where
+  where,
+  deleteDoc
 } from 'firebase/firestore';
 import { initDbSync, deleteUserCloudData, clearAllLocalStores } from './services/dbSync.js';
 
@@ -4089,6 +4093,349 @@ function DeleteAccountModal({ onClose, user, username, totalSolved }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// EDIT USERNAME MODAL
+// ═══════════════════════════════════════════════════════════════
+function EditUsernameModal({ onClose, user, currentUsername, onSuccess }) {
+  const [newUsername, setNewUsername] = useState('');
+  const [step, setStep] = useState('form'); // 'form', 'saving', 'success'
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const uId = newUsername.trim().toLowerCase();
+    if (!uId) return;
+
+    const userIdRegex = /^[a-zA-Z0-9_-]+$/;
+    if (!userIdRegex.test(uId)) {
+      setError('Username can only contain letters, numbers, underscores, or hyphens.');
+      return;
+    }
+    if (uId.length < 3) {
+      setError('Username must be at least 3 characters long.');
+      return;
+    }
+    if (uId === currentUsername?.toLowerCase()) {
+      setError('That is already your current username.');
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+    setStep('saving');
+
+    try {
+      // 1. Check uniqueness
+      const newDocRef = doc(db, 'users', uId);
+      const existing = await getDoc(newDocRef);
+      if (existing.exists()) {
+        throw new Error('This username is already taken. Please choose another.');
+      }
+
+      // 2. Create new doc with same data
+      await setDoc(newDocRef, {
+        userId: user.uid,
+        username: uId,
+        email: user.email || ''
+      });
+
+      // 3. Delete old doc
+      const oldDocRef = doc(db, 'users', currentUsername.toLowerCase());
+      await deleteDoc(oldDocRef);
+
+      // 4. Update Firebase Auth displayName
+      await updateProfile(user, { displayName: uId });
+
+      // 5. Update Zustand store
+      useProgressStore.setState((prev) => ({
+        profiles: {
+          ...prev.profiles,
+          'default': {
+            ...prev.profiles['default'],
+            name: uId
+          }
+        }
+      }));
+
+      setStep('success');
+      setTimeout(() => {
+        onSuccess(uId);
+        onClose();
+      }, 1500);
+    } catch (err) {
+      console.error(err);
+      setError(err.message);
+      setStep('form');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return createPortal(
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Pencil size={18} /> Edit Username
+          </div>
+          <button className="modal-close" onClick={onClose} disabled={loading}><X size={18} /></button>
+        </div>
+
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {step === 'success' ? (
+            <div style={{ textAlign: 'center', padding: '20px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: '50%',
+                background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--success)'
+              }}>
+                <Check size={24} />
+              </div>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>Username updated!</div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Your new username is <strong>{newUsername.trim().toLowerCase()}</strong></div>
+            </div>
+          ) : step === 'saving' ? (
+            <div style={{ textAlign: 'center', padding: '30px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+              <RefreshCw className="spin" size={32} color="var(--accent-primary)" />
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Updating username...</div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{
+                padding: '10px 12px', background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)',
+                fontSize: 13, color: 'var(--text-secondary)'
+              }}>
+                Current username: <strong style={{ color: 'var(--text-primary)' }}>@{currentUsername}</strong>
+              </div>
+
+              {error && (
+                <div style={{
+                  padding: '10px 12px', background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 'var(--radius-md)',
+                  color: 'var(--error)', fontSize: 13
+                }}>
+                  <AlertTriangle size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> {error}
+                </div>
+              )}
+
+              <div className="lc-input-group">
+                <label>New Username</label>
+                <input
+                  type="text"
+                  placeholder="e.g. coderdan99"
+                  value={newUsername}
+                  onChange={e => setNewUsername(e.target.value)}
+                  className="lc-input"
+                  required
+                  autoFocus
+                />
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>
+                  Lowercase letters, numbers, underscores, hyphens. Min 3 characters.
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button type="button" className="btn btn-secondary" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={loading || !newUsername.trim()} style={{ flex: 1 }}>
+                  Save Username
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PASSWORD SETTINGS MODAL
+// ═══════════════════════════════════════════════════════════════
+function PasswordSettingsModal({ onClose, user }) {
+  // Determine if user has email/password provider
+  const hasEmailProvider = user?.providerData?.some(p => p.providerId === 'password');
+  const isGoogleOnly = !hasEmailProvider;
+
+  const [step, setStep] = useState('form'); // 'form', 'processing', 'success'
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (newPassword !== confirmPassword) {
+      setError('New passwords do not match.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+
+    setLoading(true);
+    setStep('processing');
+
+    try {
+      if (isGoogleOnly) {
+        // Link email/password credential to the Google account
+        const credential = EmailAuthProvider.credential(user.email, newPassword);
+        await linkWithCredential(user, credential);
+      } else {
+        // Re-authenticate then change password
+        if (!currentPassword) {
+          setError('Please enter your current password.');
+          setStep('form');
+          setLoading(false);
+          return;
+        }
+        const credential = EmailAuthProvider.credential(user.email, currentPassword);
+        await reauthenticateWithCredential(user, credential);
+        await updatePassword(user, newPassword);
+      }
+
+      setStep('success');
+    } catch (err) {
+      console.error(err);
+      let errMsg = err.message;
+      if (err.code === 'auth/wrong-password') errMsg = 'Incorrect current password.';
+      if (err.code === 'auth/too-many-requests') errMsg = 'Too many failed attempts. Please try again later.';
+      if (err.code === 'auth/provider-already-linked') errMsg = 'A password is already set on this account. Please sign in with password to change it.';
+      if (err.code === 'auth/requires-recent-login') errMsg = 'Session expired. Please sign out and sign back in to change your password.';
+      if (err.code === 'auth/weak-password') errMsg = 'Password must be at least 6 characters.';
+      setError(errMsg);
+      setStep('form');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return createPortal(
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Key size={18} /> {isGoogleOnly ? 'Set Password' : 'Change Password'}
+          </div>
+          <button className="modal-close" onClick={onClose} disabled={loading}><X size={18} /></button>
+        </div>
+
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {step === 'success' ? (
+            <div style={{ textAlign: 'center', padding: '20px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: '50%',
+                background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--success)'
+              }}>
+                <Check size={24} />
+              </div>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>
+                {isGoogleOnly ? 'Password set successfully!' : 'Password changed!'}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                {isGoogleOnly
+                  ? 'You can now sign in with your username and password in addition to Google.'
+                  : 'Your password has been updated.'}
+              </div>
+              <button className="btn btn-primary" onClick={onClose} style={{ marginTop: 8, padding: '8px 24px' }}>Done</button>
+            </div>
+          ) : step === 'processing' ? (
+            <div style={{ textAlign: 'center', padding: '30px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+              <RefreshCw className="spin" size={32} color="var(--accent-primary)" />
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                {isGoogleOnly ? 'Setting up password login...' : 'Updating password...'}
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {isGoogleOnly && (
+                <div style={{
+                  padding: '10px 12px', background: 'rgba(255, 161, 22, 0.07)',
+                  border: '1px solid rgba(255, 161, 22, 0.2)', borderRadius: 'var(--radius-md)',
+                  fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5
+                }}>
+                  <strong style={{ color: 'var(--accent-primary)' }}>Enable password login</strong><br />
+                  Set a password so you can also sign in with your <strong>username + password</strong> (not just Google).
+                </div>
+              )}
+
+              {error && (
+                <div style={{
+                  padding: '10px 12px', background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 'var(--radius-md)',
+                  color: 'var(--error)', fontSize: 13
+                }}>
+                  <AlertTriangle size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} /> {error}
+                </div>
+              )}
+
+              {!isGoogleOnly && (
+                <div className="lc-input-group">
+                  <label>Current Password</label>
+                  <input
+                    type="password"
+                    placeholder="Enter current password"
+                    value={currentPassword}
+                    onChange={e => setCurrentPassword(e.target.value)}
+                    className="lc-input"
+                    required
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              <div className="lc-input-group">
+                <label>{isGoogleOnly ? 'Password' : 'New Password'}</label>
+                <input
+                  type="password"
+                  placeholder="At least 6 characters"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  className="lc-input"
+                  required
+                  autoFocus={isGoogleOnly}
+                />
+              </div>
+
+              <div className="lc-input-group">
+                <label>Confirm {isGoogleOnly ? 'Password' : 'New Password'}</label>
+                <input
+                  type="password"
+                  placeholder="Repeat the password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  className="lc-input"
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button type="button" className="btn btn-secondary" onClick={onClose} style={{ flex: 1 }}>Cancel</button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={loading || !newPassword || !confirmPassword}
+                  style={{ flex: 1 }}
+                >
+                  {isGoogleOnly ? 'Set Password' : 'Change Password'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // LEETCODE-STYLE PROFILE PAGE
 // ═══════════════════════════════════════════════════════════════
 function ProfilePage({ user, syncStatus, onLogout }) {
@@ -4100,7 +4447,14 @@ function ProfilePage({ user, syncStatus, onLogout }) {
   
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  
+  const [editUsernameOpen, setEditUsernameOpen] = useState(false);
+  const [passwordSettingsOpen, setPasswordSettingsOpen] = useState(false);
+  // Track local username (updates instantly on rename)
+  const [localUsername, setLocalUsername] = useState(user?.displayName || profile.name || '');
+  useEffect(() => {
+    setLocalUsername(user?.displayName || profile.name || '');
+  }, [user?.displayName, profile.name]);
+
   // Solved and status metrics
   const questionStatus = profile.questionStatus || {};
   const bookmarks = profile.bookmarks || [];
@@ -4231,7 +4585,7 @@ function ProfilePage({ user, syncStatus, onLogout }) {
                 Edit Avatar
               </button>
               <div className="profile-display-name">
-                {user?.displayName || profile.name}
+                {localUsername || user?.displayName || profile.name}
               </div>
               {user?.email && (
                 <div className="profile-email">
@@ -4289,6 +4643,24 @@ function ProfilePage({ user, syncStatus, onLogout }) {
             )}
             {user && (
               <>
+                {/* Edit Username */}
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setEditUsernameOpen(true)}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                >
+                  <Pencil size={14} /> Edit Username
+                </button>
+
+                {/* Password Settings */}
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setPasswordSettingsOpen(true)}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                >
+                  <Key size={14} /> {user?.providerData?.some(p => p.providerId === 'password') ? 'Change Password' : 'Set Password'}
+                </button>
+
                 <button className="btn btn-secondary btn-sm" onClick={handleLogout} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                   <LogOut size={14} /> Sign Out
                 </button>
@@ -4473,6 +4845,20 @@ function ProfilePage({ user, syncStatus, onLogout }) {
             user={user}
             username={user?.displayName || profile.name}
             totalSolved={totalSolved}
+          />
+        )}
+        {editUsernameOpen && user && (
+          <EditUsernameModal
+            onClose={() => setEditUsernameOpen(false)}
+            user={user}
+            currentUsername={localUsername || user?.displayName || profile.name}
+            onSuccess={(newName) => setLocalUsername(newName)}
+          />
+        )}
+        {passwordSettingsOpen && user && (
+          <PasswordSettingsModal
+            onClose={() => setPasswordSettingsOpen(false)}
+            user={user}
           />
         )}
       </div>
