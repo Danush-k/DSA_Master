@@ -224,7 +224,7 @@ async function hydrateFromCloud(user) {
         await setDoc(doc(db, 'profiles', docId), {
           userId: user.uid,
           profileKey: activeProfileId,
-          name: localProfile.name || 'Danush',
+          name: user.displayName || localProfile.name || 'Danush',
           avatar: localProfile.avatar || '🦊',
           createdAt: new Date().toISOString()
         });
