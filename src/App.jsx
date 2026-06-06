@@ -312,7 +312,7 @@ function Sidebar({ isOpen, onClose }) {
           <div className="sidebar-logo-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <LeetCodeLogo size={20} />
           </div>
-          <span className="sidebar-logo-text">Danush</span>
+          <span className="sidebar-logo-text">DSA Mastery</span>
         </div>
         <nav className="sidebar-nav">
           <div className="sidebar-section-label">Main</div>
@@ -2379,7 +2379,7 @@ function AppLayout() {
     if (location.pathname === '/login') return 'Account Login';
     if (location.pathname === '/profile') return 'User Profile';
     if (location.pathname === '/verify-email') return 'Email Verification';
-    return 'Danush';
+    return 'DSA Mastery';
   };
 
   const handleAuthClick = () => {
