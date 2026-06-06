@@ -19,7 +19,7 @@ const useProgressStore = create(
       profiles: {
         'default': {
           name: 'Danush',
-          avatar: '#FFA116',
+          avatar: '🦊',
           ...DEFAULT_PROFILE_STATE
         }
       },
@@ -237,7 +237,7 @@ const useProgressStore = create(
           profiles: {
             'default': {
               name: 'Danush',
-              avatar: '#FFA116',
+              avatar: '🦊',
               ...DEFAULT_PROFILE_STATE
             }
           }
