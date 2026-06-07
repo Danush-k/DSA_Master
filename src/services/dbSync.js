@@ -137,6 +137,13 @@ export function initDbSync(onStatusChange) {
           userId: authUser.uid,
           profileKey: activeProfileId,
           questionId: numId,
+          keyIdea: noteData?.keyIdea || '',
+          mistakes: noteData?.mistakes || '',
+          optimalApproach: noteData?.optimalApproach || '',
+          timeComplexity: noteData?.timeComplexity || '',
+          spaceComplexity: noteData?.spaceComplexity || '',
+          notes: noteData?.notes || '',
+          interviewLearnings: noteData?.interviewLearnings || '',
           note: noteData?.notes || '',
           code: noteData?.code || '',
           why: noteData?.why || '',
@@ -356,9 +363,15 @@ async function hydrateFromCloud(user) {
       const pk = row.profileKey;
       if (!notesStoreState.profiles[pk]) notesStoreState.profiles[pk] = {};
       notesStoreState.profiles[pk][row.questionId] = {
-        notes: row.note,
-        code: row.code,
-        why: row.why,
+        keyIdea: row.keyIdea || '',
+        mistakes: row.mistakes || '',
+        optimalApproach: row.optimalApproach || '',
+        timeComplexity: row.timeComplexity || '',
+        spaceComplexity: row.spaceComplexity || '',
+        notes: row.notes || row.note || '',
+        interviewLearnings: row.interviewLearnings || '',
+        code: row.code || '',
+        why: row.why || '',
         updatedAt: row.updatedAt
       };
     });
