@@ -3,6 +3,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import {
   doc,
   setDoc,
+  getDoc,
   getDocs,
   query,
   where,
@@ -50,7 +51,7 @@ export function initDbSync(onStatusChange) {
 
     // 1. Sync custom questions changes
     if (JSON.stringify(profile.customQuestions) !== JSON.stringify(prevProfile?.customQuestions)) {
-      await syncCustomQuestions(profile.customQuestions, activeProfileId);
+      await syncCustomQuestions(profile.customQuestions);
     }
 
     // 2. Sync question status (solved, etc.) and bookmarks
@@ -70,10 +71,9 @@ export function initDbSync(onStatusChange) {
       const prevBookmarked = prevBookmarks.includes(numId);
 
       if (status !== prevStatus || bookmarked !== prevBookmarked) {
-        const docId = `${authUser.uid}_${activeProfileId}_${numId}`;
+        const docId = `${authUser.uid}_${numId}`;
         await setDoc(doc(db, 'user_progress', docId), {
-          userId: authUser.uid,
-          profileKey: activeProfileId,
+          uid: authUser.uid,
           questionId: numId,
           status,
           bookmarked,
@@ -99,10 +99,8 @@ export function initDbSync(onStatusChange) {
         JSON.stringify(p.solveHistory) !== JSON.stringify(prevP?.solveHistory);
 
       if (metaChanged) {
-        const docId = `${authUser.uid}_${key}`;
-        await setDoc(doc(db, 'profiles', docId), {
-          userId: authUser.uid,
-          profileKey: key,
+        const docRef = doc(db, 'users', authUser.uid);
+        await setDoc(docRef, {
           name: p.name,
           avatar: p.avatar,
           currentStreak: p.currentStreak || 0,
@@ -111,7 +109,7 @@ export function initDbSync(onStatusChange) {
           dailySolves: p.dailySolves || {},
           solveHistory: (p.solveHistory || []).slice(0, 50),
           updatedAt: new Date().toISOString()
-        });
+        }, { merge: true });
       }
     }
   });
@@ -132,10 +130,9 @@ export function initDbSync(onStatusChange) {
       const prevNoteData = prevNotes[numId];
 
       if (JSON.stringify(noteData) !== JSON.stringify(prevNoteData)) {
-        const docId = `${authUser.uid}_${activeProfileId}_${numId}`;
+        const docId = `${authUser.uid}_${numId}`;
         await setDoc(doc(db, 'user_notes', docId), {
-          userId: authUser.uid,
-          profileKey: activeProfileId,
+          uid: authUser.uid,
           questionId: numId,
           keyIdea: noteData?.keyIdea || '',
           mistakes: noteData?.mistakes || '',
@@ -169,13 +166,12 @@ export function initDbSync(onStatusChange) {
       const prevRev = prevRevisions[numId];
 
       if (JSON.stringify(rev) !== JSON.stringify(prevRev)) {
-        const docId = `${authUser.uid}_${activeProfileId}_${numId}`;
+        const docId = `${authUser.uid}_${numId}`;
         if (!rev) {
           await deleteDoc(doc(db, 'user_revisions', docId));
         } else {
           await setDoc(doc(db, 'user_revisions', docId), {
-            userId: authUser.uid,
-            profileKey: activeProfileId,
+            uid: authUser.uid,
             questionId: numId,
             revisionCount: rev?.revisionCount || 0,
             nextRevisionDate: rev?.nextRevisionDate || null,
@@ -189,14 +185,13 @@ export function initDbSync(onStatusChange) {
 }
 
 // Sync custom questions helper
-async function syncCustomQuestions(customQuestions, profileId) {
+async function syncCustomQuestions(customQuestions) {
   if (!authUser) return;
   
   for (const q of customQuestions) {
-    const docId = `${authUser.uid}_${profileId}_${q.id}`;
+    const docId = `${authUser.uid}_${q.id}`;
     await setDoc(doc(db, 'custom_questions', docId), {
-      userId: authUser.uid,
-      profileKey: profileId,
+      uid: authUser.uid,
       id: q.id,
       num: q.num,
       title: q.title,
@@ -217,197 +212,180 @@ async function syncCustomQuestions(customQuestions, profileId) {
 async function hydrateFromCloud(user) {
   isHydrating = true;
   try {
-    // 1. Fetch profiles
-    const profilesQuery = query(collection(db, 'profiles'), where('userId', '==', user.uid));
-    const profilesSnap = await getDocs(profilesQuery);
+    // 1. Fetch user profile doc
+    const userDocRef = doc(db, 'users', user.uid);
+    const userDocSnap = await getDoc(userDocRef);
 
     // 2. Fetch progress
-    const progressQuery = query(collection(db, 'user_progress'), where('userId', '==', user.uid));
+    const progressQuery = query(collection(db, 'user_progress'), where('uid', '==', user.uid));
     const progressSnap = await getDocs(progressQuery);
 
     // 3. Fetch custom questions
-    const customQuery = query(collection(db, 'custom_questions'), where('userId', '==', user.uid));
+    const customQuery = query(collection(db, 'custom_questions'), where('uid', '==', user.uid));
     const customSnap = await getDocs(customQuery);
 
     // 4. Fetch notes
-    const notesQuery = query(collection(db, 'user_notes'), where('userId', '==', user.uid));
+    const notesQuery = query(collection(db, 'user_notes'), where('uid', '==', user.uid));
     const notesSnap = await getDocs(notesQuery);
 
     // 5. Fetch revisions
-    const revisionsQuery = query(collection(db, 'user_revisions'), where('userId', '==', user.uid));
+    const revisionsQuery = query(collection(db, 'user_revisions'), where('uid', '==', user.uid));
     const revisionsSnap = await getDocs(revisionsQuery);
 
     // Deep-clone current store states so React detects changes on setState
     const currentProgress = useProgressStore.getState();
     const progressStoreState = {
-      activeProfileId: currentProgress.activeProfileId,
-      profiles: Object.fromEntries(
-        Object.entries(currentProgress.profiles).map(([k, v]) => [k, { ...v, questionStatus: { ...v.questionStatus }, bookmarks: [...(v.bookmarks || []), ], dailySolves: { ...(v.dailySolves || {}) }, solveHistory: [...(v.solveHistory || [])] }])
-      )
+      activeProfileId: currentProgress.activeProfileId || 'default',
+      profiles: {
+        'default': {
+          name: user.displayName || 'User',
+          avatar: '🦊',
+          questionStatus: {},
+          dailySolves: {},
+          bookmarks: [],
+          currentStreak: 0,
+          longestStreak: 0,
+          lastSolveDate: null,
+          customQuestions: [],
+          solveHistory: []
+        }
+      }
     };
+
     const currentNotes = useNotesStore.getState();
     const notesStoreState = {
-      ...currentNotes,
-      profiles: Object.fromEntries(
-        Object.entries(currentNotes.profiles).map(([k, v]) => [k, { ...v }])
-      )
+      activeProfileId: 'default',
+      profiles: {
+        'default': {}
+      }
     };
+
     const currentRevisions = useRevisionStore.getState();
     const revisionStoreState = {
-      ...currentRevisions,
-      profiles: Object.fromEntries(
-        Object.entries(currentRevisions.profiles).map(([k, v]) => [k, { ...v }])
-      )
+      activeProfileId: 'default',
+      profiles: {
+        'default': {}
+      }
     };
 
-    // Initialize local stores based on dbProfiles
-    if (profilesSnap.empty) {
-      // Save default local profile for new user
-      const activeProfileId = progressStoreState.activeProfileId || 'default';
-      const localProfile = progressStoreState.profiles[activeProfileId];
-      if (localProfile) {
-        const docId = `${user.uid}_${activeProfileId}`;
-        await setDoc(doc(db, 'profiles', docId), {
-          userId: user.uid,
-          profileKey: activeProfileId,
-          name: user.displayName || localProfile.name || 'User',
-          avatar: localProfile.avatar || '#FFA116',
-          currentStreak: localProfile.currentStreak || 0,
-          longestStreak: localProfile.longestStreak || 0,
-          lastSolveDate: localProfile.lastSolveDate || null,
-          dailySolves: localProfile.dailySolves || {},
-          solveHistory: (localProfile.solveHistory || []).slice(0, 50),
-          updatedAt: new Date().toISOString()
-        });
-      }
+    // Initialize local stores based on user doc
+    if (userDocSnap.exists()) {
+      const uData = userDocSnap.data();
+      const p = progressStoreState.profiles['default'];
+      p.name = uData.name || uData.username || user.displayName || 'User';
+      p.avatar = uData.avatar || '🦊';
+      p.currentStreak = uData.currentStreak || 0;
+      p.longestStreak = uData.longestStreak || 0;
+      p.lastSolveDate = uData.lastSolveDate || null;
+      p.dailySolves = uData.dailySolves || {};
+      p.solveHistory = uData.solveHistory || [];
     } else {
-      profilesSnap.forEach(docSnap => {
-        const p = docSnap.data();
-        const pk = p.profileKey;
-        if (!progressStoreState.profiles[pk]) {
-          progressStoreState.profiles[pk] = {
-            name: p.name,
-            avatar: p.avatar,
-            questionStatus: {},
-            dailySolves: p.dailySolves || {},
-            bookmarks: [],
-            currentStreak: p.currentStreak || 0,
-            longestStreak: p.longestStreak || 0,
-            lastSolveDate: p.lastSolveDate || null,
-            customQuestions: [],
-            solveHistory: p.solveHistory || []
-          };
-        } else {
-          // Restore all profile metadata from cloud (authoritative source)
-          progressStoreState.profiles[pk].name = p.name;
-          progressStoreState.profiles[pk].avatar = p.avatar;
-          progressStoreState.profiles[pk].currentStreak = p.currentStreak || 0;
-          progressStoreState.profiles[pk].longestStreak = p.longestStreak || 0;
-          progressStoreState.profiles[pk].lastSolveDate = p.lastSolveDate || null;
-          progressStoreState.profiles[pk].dailySolves = p.dailySolves || {};
-          progressStoreState.profiles[pk].solveHistory = p.solveHistory || [];
-        }
-
-        if (!notesStoreState.profiles[pk]) notesStoreState.profiles[pk] = {};
-        if (!revisionStoreState.profiles[pk]) revisionStoreState.profiles[pk] = {};
+      // Save default local profile for new user
+      const p = progressStoreState.profiles['default'];
+      await setDoc(doc(db, 'users', user.uid), {
+        uid: user.uid,
+        username: user.displayName || 'User',
+        email: user.email || '',
+        name: p.name,
+        avatar: p.avatar,
+        currentStreak: p.currentStreak || 0,
+        longestStreak: p.longestStreak || 0,
+        lastSolveDate: p.lastSolveDate || null,
+        dailySolves: p.dailySolves || {},
+        solveHistory: p.solveHistory || [],
+        updatedAt: new Date().toISOString()
       });
+      // Also register username registry doc in case they signed up via OAuth and have a displayName
+      if (user.displayName) {
+        const usernameLower = user.displayName.toLowerCase();
+        const usernameDocRef = doc(db, 'usernames', usernameLower);
+        const usernameDoc = await getDoc(usernameDocRef);
+        if (!usernameDoc.exists()) {
+          await setDoc(usernameDocRef, { uid: user.uid });
+        }
+      }
     }
 
     // Hydrate progress (questionStatus + bookmarks)
     const reconstructedDailySolves = {};
-    const reconstructedSolveHistory = {};
+    const reconstructedSolveHistory = [];
 
     progressSnap.forEach(docSnap => {
       const row = docSnap.data();
-      const pk = row.profileKey;
-      if (!progressStoreState.profiles[pk]) return;
-
-      if (!reconstructedDailySolves[pk]) reconstructedDailySolves[pk] = {};
-      if (!reconstructedSolveHistory[pk]) reconstructedSolveHistory[pk] = [];
+      const pk = 'default';
 
       if (row.status === 'solved') {
         progressStoreState.profiles[pk].questionStatus[row.questionId] = row.status;
         const dateStr = row.updatedAt ? row.updatedAt.split('T')[0] : null;
         if (dateStr) {
-          reconstructedDailySolves[pk][dateStr] = (reconstructedDailySolves[pk][dateStr] || 0) + 1;
+          reconstructedDailySolves[dateStr] = (reconstructedDailySolves[dateStr] || 0) + 1;
         }
-        reconstructedSolveHistory[pk].push({
+        reconstructedSolveHistory.push({
           questionId: row.questionId,
           solvedAt: row.updatedAt || new Date().toISOString()
         });
       } else if (row.status) {
         progressStoreState.profiles[pk].questionStatus[row.questionId] = row.status;
-      } else {
-        delete progressStoreState.profiles[pk].questionStatus[row.questionId];
       }
 
-      const bIdx = progressStoreState.profiles[pk].bookmarks.indexOf(row.questionId);
-      if (row.bookmarked && bIdx === -1) {
+      if (row.bookmarked) {
         progressStoreState.profiles[pk].bookmarks.push(row.questionId);
-      } else if (!row.bookmarked && bIdx > -1) {
-        progressStoreState.profiles[pk].bookmarks.splice(bIdx, 1);
       }
     });
 
     // Reconstruct / heal profile metadata to match questionStatus solves
-    Object.keys(progressStoreState.profiles).forEach(pk => {
-      const profile = progressStoreState.profiles[pk];
-      const daily = reconstructedDailySolves[pk] || {};
-      const history = reconstructedSolveHistory[pk] || [];
+    const profile = progressStoreState.profiles['default'];
+    
+    // Sort and slice history
+    reconstructedSolveHistory.sort((a, b) => b.solvedAt.localeCompare(a.solvedAt));
+    const slicedHistory = reconstructedSolveHistory.slice(0, 50);
 
-      // Sort and slice history
-      history.sort((a, b) => b.solvedAt.localeCompare(a.solvedAt));
-      const slicedHistory = history.slice(0, 50);
+    // Reconstruct streak based on daily solves
+    const sortedDates = Object.keys(reconstructedDailySolves)
+      .filter(date => reconstructedDailySolves[date] > 0)
+      .sort();
 
-      // Reconstruct streak based on daily
-      const sortedDates = Object.keys(daily)
-        .filter(date => daily[date] > 0)
-        .sort();
+    let lastSolveDate = null;
+    let currentStreak = 0;
+    const today = new Date().toISOString().split('T')[0];
 
-      let lastSolveDate = null;
-      let currentStreak = 0;
-      const today = new Date().toISOString().split('T')[0];
+    if (sortedDates.length > 0) {
+      const lastDateStr = sortedDates[sortedDates.length - 1];
+      const todayDate = new Date(today);
+      const lastDate = new Date(lastDateStr);
+      const diffTime = Math.abs(todayDate - lastDate);
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
-      if (sortedDates.length > 0) {
-        const lastDateStr = sortedDates[sortedDates.length - 1];
-        const todayDate = new Date(today);
-        const lastDate = new Date(lastDateStr);
-        const diffTime = Math.abs(todayDate - lastDate);
-        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-
-        if (diffDays <= 1) {
-          lastSolveDate = lastDateStr;
-          currentStreak = 1;
-          let checkDate = new Date(lastDate);
-          while (true) {
-            checkDate.setDate(checkDate.getDate() - 1);
-            const checkDateStr = checkDate.toISOString().split('T')[0];
-            if (daily[checkDateStr] > 0) {
-              currentStreak++;
-            } else {
-              break;
-            }
+      if (diffDays <= 1) {
+        lastSolveDate = lastDateStr;
+        currentStreak = 1;
+        let checkDate = new Date(lastDate);
+        while (true) {
+          checkDate.setDate(checkDate.getDate() - 1);
+          const checkDateStr = checkDate.toISOString().split('T')[0];
+          if (reconstructedDailySolves[checkDateStr] > 0) {
+            currentStreak++;
+          } else {
+            break;
           }
-        } else {
-          lastSolveDate = lastDateStr;
-          currentStreak = 0;
         }
+      } else {
+        lastSolveDate = lastDateStr;
+        currentStreak = 0;
       }
+    }
 
-      profile.dailySolves = { ...daily };
-      profile.solveHistory = slicedHistory;
-      profile.currentStreak = currentStreak;
-      profile.longestStreak = Math.max(profile.longestStreak || 0, currentStreak);
-      profile.lastSolveDate = lastSolveDate;
-    });
+    profile.dailySolves = { ...reconstructedDailySolves };
+    profile.solveHistory = slicedHistory;
+    profile.currentStreak = currentStreak;
+    profile.longestStreak = Math.max(profile.longestStreak || 0, currentStreak);
+    profile.lastSolveDate = lastSolveDate;
 
     // Hydrate custom questions
-    const customQGroups = {};
+    const customQs = [];
     customSnap.forEach(docSnap => {
       const row = docSnap.data();
-      const pk = row.profileKey;
-      if (!customQGroups[pk]) customQGroups[pk] = [];
-      customQGroups[pk].push({
+      customQs.push({
         id: row.id,
         num: row.num,
         title: row.title,
@@ -422,19 +400,12 @@ async function hydrateFromCloud(user) {
         isCustom: true
       });
     });
-
-    Object.entries(customQGroups).forEach(([pk, qs]) => {
-      if (progressStoreState.profiles[pk]) {
-        progressStoreState.profiles[pk].customQuestions = qs;
-      }
-    });
+    profile.customQuestions = customQs;
 
     // Hydrate notes
     notesSnap.forEach(docSnap => {
       const row = docSnap.data();
-      const pk = row.profileKey;
-      if (!notesStoreState.profiles[pk]) notesStoreState.profiles[pk] = {};
-      notesStoreState.profiles[pk][row.questionId] = {
+      notesStoreState.profiles['default'][row.questionId] = {
         keyIdea: row.keyIdea || '',
         mistakes: row.mistakes || '',
         optimalApproach: row.optimalApproach || '',
@@ -451,13 +422,11 @@ async function hydrateFromCloud(user) {
     // Hydrate revisions
     revisionsSnap.forEach(docSnap => {
       const row = docSnap.data();
-      const pk = row.profileKey;
-      if (!revisionStoreState.profiles[pk]) revisionStoreState.profiles[pk] = {};
       
       // Only hydrate if the question is currently solved!
-      const status = progressStoreState.profiles[pk]?.questionStatus[row.questionId];
+      const status = progressStoreState.profiles['default']?.questionStatus[row.questionId];
       if (status === 'solved') {
-        revisionStoreState.profiles[pk][row.questionId] = {
+        revisionStoreState.profiles['default'][row.questionId] = {
           revisionCount: row.revisionCount,
           nextRevisionDate: row.nextRevisionDate,
           completed: row.completed
@@ -465,7 +434,7 @@ async function hydrateFromCloud(user) {
       }
     });
 
-    // Set updated Zustand store states — new object references guarantee re-renders
+    // Set updated Zustand store states
     useProgressStore.setState({ ...progressStoreState });
     useNotesStore.setState({ ...notesStoreState });
     useRevisionStore.setState({ ...revisionStoreState });
@@ -481,11 +450,23 @@ async function hydrateFromCloud(user) {
 export async function deleteUserCloudData(user) {
   if (!db || !user) return;
   
-  const collections = ['users', 'profiles', 'user_progress', 'user_notes', 'user_revisions', 'custom_questions'];
-  
+  // 1. Get username for registry lookup doc
+  let username = null;
+  try {
+    const userDocRef = doc(db, 'users', user.uid);
+    const userDocSnap = await getDoc(userDocRef);
+    if (userDocSnap.exists()) {
+      username = userDocSnap.data().username;
+    }
+  } catch (err) {
+    console.error("Failed to retrieve username for deletion mapping:", err);
+  }
+
+  // 2. Delete the user's data documents in other collections by querying uid
+  const collections = ['user_progress', 'user_notes', 'user_revisions', 'custom_questions'];
   for (const collName of collections) {
     try {
-      const q = query(collection(db, collName), where('userId', '==', user.uid));
+      const q = query(collection(db, collName), where('uid', '==', user.uid));
       const snap = await getDocs(q);
       const deletePromises = [];
       snap.forEach((docSnap) => {
@@ -494,6 +475,22 @@ export async function deleteUserCloudData(user) {
       await Promise.all(deletePromises);
     } catch (err) {
       console.error(`Failed to delete collection ${collName} for user:`, err);
+    }
+  }
+
+  // 3. Delete user profile doc
+  try {
+    await deleteDoc(doc(db, 'users', user.uid));
+  } catch (err) {
+    console.error("Failed to delete user document:", err);
+  }
+
+  // 4. Delete username reservation registry doc
+  if (username) {
+    try {
+      await deleteDoc(doc(db, 'usernames', username.toLowerCase()));
+    } catch (err) {
+      console.error(`Failed to delete username mapping for ${username}:`, err);
     }
   }
 }

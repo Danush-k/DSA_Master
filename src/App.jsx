@@ -3143,10 +3143,10 @@ function LoginPage({ user }) {
     if (!currentUser) return;
     setCheckingUserId(true);
     try {
-      const q = query(collection(db, 'users'), where('userId', '==', currentUser.uid));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        const userDoc = snap.docs[0].data();
+      const userDocRef = doc(db, 'users', currentUser.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      if (userDocSnap.exists()) {
+        const userDoc = userDocSnap.data();
         const mappedUsername = userDoc.username;
         
         if (currentUser.displayName !== mappedUsername) {
@@ -3178,11 +3178,26 @@ function LoginPage({ user }) {
         // Migration for legacy user with local dsamastery.local emails
         if (currentUser.email && currentUser.email.endsWith('@dsamastery.local')) {
           const legacyUsername = currentUser.email.split('@')[0];
-          await setDoc(doc(db, 'users', legacyUsername.toLowerCase()), {
-            userId: currentUser.uid,
+          const lowerUsername = legacyUsername.toLowerCase();
+          
+          await setDoc(doc(db, 'users', currentUser.uid), {
+            uid: currentUser.uid,
             username: legacyUsername,
-            email: currentUser.email
+            email: currentUser.email,
+            name: legacyUsername,
+            avatar: '🦊',
+            currentStreak: 0,
+            longestStreak: 0,
+            lastSolveDate: null,
+            dailySolves: {},
+            solveHistory: [],
+            updatedAt: new Date().toISOString()
           });
+          
+          await setDoc(doc(db, 'usernames', lowerUsername), {
+            uid: currentUser.uid
+          });
+          
           await updateProfile(currentUser, { displayName: legacyUsername });
           navigate('/');
           return;
@@ -3231,19 +3246,32 @@ function LoginPage({ user }) {
           throw new Error('User ID cannot contain the "@" symbol.');
         }
 
-        const userDocRef = doc(db, 'users', uId.toLowerCase());
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
+        const lowerUsername = uId.toLowerCase();
+        const usernameDocRef = doc(db, 'usernames', lowerUsername);
+        const usernameDoc = await getDoc(usernameDocRef);
+        if (usernameDoc.exists()) {
           throw new Error('This User ID is already taken.');
         }
 
         const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
         const firebaseUser = userCredential.user;
 
-        await setDoc(userDocRef, {
-          userId: firebaseUser.uid,
+        await setDoc(doc(db, 'users', firebaseUser.uid), {
+          uid: firebaseUser.uid,
           username: uId,
-          email: email
+          email: email,
+          name: uId,
+          avatar: '🦊',
+          currentStreak: 0,
+          longestStreak: 0,
+          lastSolveDate: null,
+          dailySolves: {},
+          solveHistory: [],
+          updatedAt: new Date().toISOString()
+        });
+
+        await setDoc(usernameDocRef, {
+          uid: firebaseUser.uid
         });
 
         await updateProfile(firebaseUser, { displayName: uId });
@@ -3272,28 +3300,21 @@ function LoginPage({ user }) {
 
         let emailToSignIn = input;
         if (!input.includes('@')) {
-          // Primary: direct doc lookup by lowercase username key
-          const userDocRef = doc(db, 'users', input.toLowerCase());
-          let userDoc = await getDoc(userDocRef);
-
-          // Fallback: if doc not found by key, search by 'username' field
-          if (!userDoc.exists()) {
-            const q = query(
-              collection(db, 'users'),
-              where('username', '==', input.toLowerCase())
-            );
-            const snap = await getDocs(q);
-            if (!snap.empty) {
-              userDoc = snap.docs[0];
-            }
+          const usernameDocRef = doc(db, 'usernames', input.toLowerCase());
+          const usernameDoc = await getDoc(usernameDocRef);
+          if (!usernameDoc.exists()) {
+            throw new Error('Username not found. Check your username or sign in with your email address.');
           }
 
+          const userUid = usernameDoc.data().uid;
+          const userDocRef = doc(db, 'users', userUid);
+          const userDoc = await getDoc(userDocRef);
           if (!userDoc.exists()) {
-            throw new Error('Username not found. Check your username or sign in with your email address.');
+            throw new Error('User data not found for this username.');
           }
           emailToSignIn = userDoc.data().email;
           if (!emailToSignIn) {
-            throw new Error('No email linked to this username. Please sign in with Google.');
+            throw new Error('No email linked to this username.');
           }
         }
 
@@ -3301,10 +3322,30 @@ function LoginPage({ user }) {
       } else if (mode === 'forgot') {
         const input = usernameOrEmail.trim();
         if (!input) return;
+        
+        let emailToReset = input;
         if (!input.includes('@')) {
+          // Allow forgot password by username lookup
+          const usernameDocRef = doc(db, 'usernames', input.toLowerCase());
+          const usernameDoc = await getDoc(usernameDocRef);
+          if (!usernameDoc.exists()) {
+            throw new Error('Username not found.');
+          }
+          const userUid = usernameDoc.data().uid;
+          const userDocRef = doc(db, 'users', userUid);
+          const userDoc = await getDoc(userDocRef);
+          if (!userDoc.exists()) {
+            throw new Error('User data not found.');
+          }
+          emailToReset = userDoc.data().email;
+          if (!emailToReset || emailToReset.endsWith('@dsamastery.local')) {
+            throw new Error('Password reset is only supported for accounts registered with a real email address.');
+          }
+        } else if (input.endsWith('@dsamastery.local')) {
           throw new Error('Password reset is only supported for accounts registered with a real email address.');
         }
-        await sendPasswordResetEmail(auth, input);
+
+        await sendPasswordResetEmail(auth, emailToReset);
         setSuccess('Password reset link has been sent to your email.');
       }
     } catch (err) {
@@ -3343,9 +3384,9 @@ function LoginPage({ user }) {
 
     setLoading(true);
     try {
-      const userDocRef = doc(db, 'users', uId.toLowerCase());
-      const userDoc = await getDoc(userDocRef);
-      if (userDoc.exists()) {
+      const usernameDocRef = doc(db, 'usernames', uId.toLowerCase());
+      const usernameDoc = await getDoc(usernameDocRef);
+      if (usernameDoc.exists()) {
         throw new Error('This User ID is already taken.');
       }
 
@@ -3355,10 +3396,22 @@ function LoginPage({ user }) {
 
       const firebaseUser = auth.currentUser;
 
-      await setDoc(userDocRef, {
-        userId: firebaseUser.uid,
+      await setDoc(doc(db, 'users', firebaseUser.uid), {
+        uid: firebaseUser.uid,
         username: uId,
-        email: firebaseUser.email
+        email: firebaseUser.email || '',
+        name: uId,
+        avatar: '🦊',
+        currentStreak: 0,
+        longestStreak: 0,
+        lastSolveDate: null,
+        dailySolves: {},
+        solveHistory: [],
+        updatedAt: new Date().toISOString()
+      });
+
+      await setDoc(usernameDocRef, {
+        uid: firebaseUser.uid
       });
 
       await updateProfile(firebaseUser, { displayName: uId });
@@ -4189,8 +4242,11 @@ function EditUsernameModal({ onClose, user, currentUsername, onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const uId = newUsername.trim().toLowerCase();
+    const uId = newUsername.trim();
     if (!uId) return;
+
+    const lowerNew = uId.toLowerCase();
+    const lowerOld = currentUsername?.toLowerCase();
 
     const userIdRegex = /^[a-zA-Z0-9_-]+$/;
     if (!userIdRegex.test(uId)) {
@@ -4201,7 +4257,7 @@ function EditUsernameModal({ onClose, user, currentUsername, onSuccess }) {
       setError('Username must be at least 3 characters long.');
       return;
     }
-    if (uId === currentUsername?.toLowerCase()) {
+    if (lowerNew === lowerOld) {
       setError('That is already your current username.');
       return;
     }
@@ -4211,28 +4267,35 @@ function EditUsernameModal({ onClose, user, currentUsername, onSuccess }) {
     setStep('saving');
 
     try {
-      // 1. Check uniqueness
-      const newDocRef = doc(db, 'users', uId);
-      const existing = await getDoc(newDocRef);
+      // 1. Check uniqueness in the usernames collection
+      const newUsernameDocRef = doc(db, 'usernames', lowerNew);
+      const existing = await getDoc(newUsernameDocRef);
       if (existing.exists()) {
         throw new Error('This username is already taken. Please choose another.');
       }
 
-      // 2. Create new doc with same data
-      await setDoc(newDocRef, {
-        userId: user.uid,
-        username: uId,
-        email: user.email || ''
+      // 2. Register the new username
+      await setDoc(newUsernameDocRef, {
+        uid: user.uid
       });
 
-      // 3. Delete old doc
-      const oldDocRef = doc(db, 'users', currentUsername.toLowerCase());
-      await deleteDoc(oldDocRef);
+      // 3. Update username in the main users document
+      const userDocRef = doc(db, 'users', user.uid);
+      await setDoc(userDocRef, {
+        username: uId,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
 
-      // 4. Update Firebase Auth displayName
+      // 4. Delete the old username mapping
+      if (lowerOld) {
+        const oldUsernameDocRef = doc(db, 'usernames', lowerOld);
+        await deleteDoc(oldUsernameDocRef);
+      }
+
+      // 5. Update Firebase Auth displayName
       await updateProfile(user, { displayName: uId });
 
-      // 5. Update Zustand store
+      // 6. Update Zustand store
       useProgressStore.setState((prev) => ({
         profiles: {
           ...prev.profiles,
@@ -4373,21 +4436,35 @@ function PasswordSettingsModal({ onClose, user }) {
         const credential = EmailAuthProvider.credential(user.email, newPassword);
         await linkWithCredential(user, credential);
 
-        // CRITICAL: Ensure the Firestore username doc exists so the user can
+        // CRITICAL: Ensure the Firestore username and user documents exist so the user can
         // sign in with username + password. Google-only accounts may not have one.
-        const username = (user.displayName || '').toLowerCase();
+        const username = user.displayName;
         if (username) {
-          const userDocRef = doc(db, 'users', username);
-          const existing = await getDoc(userDocRef);
-          if (!existing.exists()) {
+          const usernameLower = username.toLowerCase();
+          const usernameDocRef = doc(db, 'usernames', usernameLower);
+          const usernameDoc = await getDoc(usernameDocRef);
+          if (!usernameDoc.exists()) {
+            await setDoc(usernameDocRef, { uid: user.uid });
+          }
+
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDoc = await getDoc(userDocRef);
+          if (!userDoc.exists()) {
             await setDoc(userDocRef, {
-              userId: user.uid,
+              uid: user.uid,
               username: username,
-              email: user.email || ''
+              email: user.email || '',
+              name: username,
+              avatar: '🦊',
+              currentStreak: 0,
+              longestStreak: 0,
+              lastSolveDate: null,
+              dailySolves: {},
+              solveHistory: [],
+              updatedAt: new Date().toISOString()
             });
-          } else if (!existing.data().email && user.email) {
-            // Patch email in case it was stored empty
-            await setDoc(userDocRef, { email: user.email }, { merge: true });
+          } else {
+            await setDoc(userDocRef, { email: user.email || '' }, { merge: true });
           }
         }
       } else {
