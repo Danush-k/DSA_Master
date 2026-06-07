@@ -10,6 +10,7 @@ const DEFAULT_PROFILE_STATE = {
   lastSolveDate: null,
   customQuestions: [],
   solveHistory: [],
+  nextCustomId: 10001,
 };
 
 const useProgressStore = create(
@@ -164,11 +165,12 @@ const useProgressStore = create(
           const profile = state.profiles[profileId] || { ...DEFAULT_PROFILE_STATE };
           const customQuestions = [...(profile.customQuestions || [])];
           
-          // Generate unique custom ID starting at 10000
-          const newId = 10000 + customQuestions.length + 1;
+          // Generate unique custom ID
+          const nextCustomId = profile.nextCustomId || (Math.max(10000, ...customQuestions.map(q => q.id)) + 1);
+          const newId = nextCustomId;
           const newQuestion = {
             id: newId,
-            num: `C${customQuestions.length + 1}`,
+            num: `C${newId - 10000}`,
             isCustom: true,
             importance: 'Good to Know',
             companies: [],
@@ -181,7 +183,8 @@ const useProgressStore = create(
               ...state.profiles,
               [profileId]: {
                 ...profile,
-                customQuestions
+                customQuestions,
+                nextCustomId: newId + 1
               }
             }
           };
