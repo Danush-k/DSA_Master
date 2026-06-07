@@ -3758,11 +3758,12 @@ function AvatarEditorModal({ onClose, activeAvatar, name }) {
   const emojis = ['🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🦖', '🐉', '👻', '⚡️'];
 
   const handleSelect = (val) => {
+    const activeProfileId = useProgressStore.getState().activeProfileId;
     useProgressStore.setState((prev) => ({
       profiles: {
         ...prev.profiles,
-        'default': {
-          ...prev.profiles['default'],
+        [activeProfileId]: {
+          ...prev.profiles[activeProfileId],
           avatar: val
         }
       }
