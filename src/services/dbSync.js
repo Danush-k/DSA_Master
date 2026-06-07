@@ -310,12 +310,28 @@ async function hydrateFromCloud(user) {
     }
 
     // Hydrate progress (questionStatus + bookmarks)
+    const reconstructedDailySolves = {};
+    const reconstructedSolveHistory = {};
+
     progressSnap.forEach(docSnap => {
       const row = docSnap.data();
       const pk = row.profileKey;
       if (!progressStoreState.profiles[pk]) return;
 
-      if (row.status) {
+      if (!reconstructedDailySolves[pk]) reconstructedDailySolves[pk] = {};
+      if (!reconstructedSolveHistory[pk]) reconstructedSolveHistory[pk] = [];
+
+      if (row.status === 'solved') {
+        progressStoreState.profiles[pk].questionStatus[row.questionId] = row.status;
+        const dateStr = row.updatedAt ? row.updatedAt.split('T')[0] : null;
+        if (dateStr) {
+          reconstructedDailySolves[pk][dateStr] = (reconstructedDailySolves[pk][dateStr] || 0) + 1;
+        }
+        reconstructedSolveHistory[pk].push({
+          questionId: row.questionId,
+          solvedAt: row.updatedAt || new Date().toISOString()
+        });
+      } else if (row.status) {
         progressStoreState.profiles[pk].questionStatus[row.questionId] = row.status;
       } else {
         delete progressStoreState.profiles[pk].questionStatus[row.questionId];
@@ -327,6 +343,58 @@ async function hydrateFromCloud(user) {
       } else if (!row.bookmarked && bIdx > -1) {
         progressStoreState.profiles[pk].bookmarks.splice(bIdx, 1);
       }
+    });
+
+    // Reconstruct / heal profile metadata to match questionStatus solves
+    Object.keys(progressStoreState.profiles).forEach(pk => {
+      const profile = progressStoreState.profiles[pk];
+      const daily = reconstructedDailySolves[pk] || {};
+      const history = reconstructedSolveHistory[pk] || [];
+
+      // Sort and slice history
+      history.sort((a, b) => b.solvedAt.localeCompare(a.solvedAt));
+      const slicedHistory = history.slice(0, 50);
+
+      // Reconstruct streak based on daily
+      const sortedDates = Object.keys(daily)
+        .filter(date => daily[date] > 0)
+        .sort();
+
+      let lastSolveDate = null;
+      let currentStreak = 0;
+      const today = new Date().toISOString().split('T')[0];
+
+      if (sortedDates.length > 0) {
+        const lastDateStr = sortedDates[sortedDates.length - 1];
+        const todayDate = new Date(today);
+        const lastDate = new Date(lastDateStr);
+        const diffTime = Math.abs(todayDate - lastDate);
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays <= 1) {
+          lastSolveDate = lastDateStr;
+          currentStreak = 1;
+          let checkDate = new Date(lastDate);
+          while (true) {
+            checkDate.setDate(checkDate.getDate() - 1);
+            const checkDateStr = checkDate.toISOString().split('T')[0];
+            if (daily[checkDateStr] > 0) {
+              currentStreak++;
+            } else {
+              break;
+            }
+          }
+        } else {
+          lastSolveDate = lastDateStr;
+          currentStreak = 0;
+        }
+      }
+
+      profile.dailySolves = { ...daily };
+      profile.solveHistory = slicedHistory;
+      profile.currentStreak = currentStreak;
+      profile.longestStreak = Math.max(profile.longestStreak || 0, currentStreak);
+      profile.lastSolveDate = lastSolveDate;
     });
 
     // Hydrate custom questions
