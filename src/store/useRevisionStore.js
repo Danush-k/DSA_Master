@@ -1,5 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import useProgressStore from './useProgressStore.js';
+
+const formatLocalDate = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 const REVISION_INTERVALS = [1, 3, 7, 15, 30];
 
@@ -45,7 +53,7 @@ const useRevisionStore = create(
           const profileId = state.activeProfileId;
           const revisions = state.profiles[profileId] || {};
           const existing = revisions[questionId];
-          const today = new Date().toISOString().split('T')[0];
+          const today = formatLocalDate();
 
           if (existing) {
             return state; // Already scheduled/in progress or completed
@@ -62,7 +70,7 @@ const useRevisionStore = create(
                 ...revisions,
                 [questionId]: {
                   revisionCount,
-                  nextRevisionDate: nextDate.toISOString().split('T')[0],
+                  nextRevisionDate: formatLocalDate(nextDate),
                   scheduledDate: today,
                   history: [],
                 },
@@ -79,7 +87,7 @@ const useRevisionStore = create(
           const revision = revisions[questionId];
           if (!revision) return state;
 
-          const today = new Date().toISOString().split('T')[0];
+          const today = formatLocalDate();
           const newCount = revision.revisionCount + 1;
 
           if (newCount >= REVISION_INTERVALS.length) {
@@ -112,7 +120,7 @@ const useRevisionStore = create(
                 [questionId]: {
                   ...revision,
                   revisionCount: newCount,
-                  nextRevisionDate: nextDate.toISOString().split('T')[0],
+                  nextRevisionDate: formatLocalDate(nextDate),
                   history: [...(revision.history || []), { date: today, revisionNumber: newCount }],
                 },
               },
@@ -125,9 +133,14 @@ const useRevisionStore = create(
         const state = get();
         const profileId = state.activeProfileId;
         const revisions = state.profiles[profileId] || {};
-        const today = new Date().toISOString().split('T')[0];
+        const progressState = useProgressStore.getState();
+        const questionStatus = progressState.profiles[profileId]?.questionStatus || {};
+        const today = formatLocalDate();
         return Object.entries(revisions)
-          .filter(([, rev]) => rev.nextRevisionDate && rev.nextRevisionDate <= today && !rev.completed)
+          .filter(([id, rev]) => {
+            const isSolved = questionStatus[id] === 'solved';
+            return isSolved && rev.nextRevisionDate && rev.nextRevisionDate <= today && !rev.completed;
+          })
           .map(([id, rev]) => ({ questionId: parseInt(id), ...rev }));
       },
 
@@ -135,9 +148,14 @@ const useRevisionStore = create(
         const state = get();
         const profileId = state.activeProfileId;
         const revisions = state.profiles[profileId] || {};
-        const today = new Date().toISOString().split('T')[0];
+        const progressState = useProgressStore.getState();
+        const questionStatus = progressState.profiles[profileId]?.questionStatus || {};
+        const today = formatLocalDate();
         return Object.entries(revisions)
-          .filter(([, rev]) => rev.nextRevisionDate && rev.nextRevisionDate > today && !rev.completed)
+          .filter(([id, rev]) => {
+            const isSolved = questionStatus[id] === 'solved';
+            return isSolved && rev.nextRevisionDate && rev.nextRevisionDate > today && !rev.completed;
+          })
           .sort((a, b) => a[1].nextRevisionDate.localeCompare(b[1].nextRevisionDate))
           .map(([id, rev]) => ({ questionId: parseInt(id), ...rev }));
       },
