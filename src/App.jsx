@@ -1065,35 +1065,35 @@ function Heatmap() {
         </div>
       </div>
 
-      <div className="heatmap-grid-outer" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {/* Month Labels row */}
-        <div style={{ display: 'flex', position: 'relative', height: 16, fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 500, margin: '0 0 4px 24px' }}>
-          {stats.monthLabels.map((label, idx) => (
-            <span
-              key={idx}
-              style={{
-                position: 'absolute',
-                left: `${label.colIndex * 13}px`,
-                transform: 'translateX(0%)',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {label.text}
-            </span>
-          ))}
+      <div style={{ display: 'flex', gap: 8, width: '100%', alignItems: 'flex-start', margin: '12px 0 0 0' }}>
+        {/* Day of week labels */}
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: 88, fontSize: 9, color: 'var(--text-tertiary)', paddingTop: 20, width: 20, flexShrink: 0 }}>
+          <span>Su</span>
+          <span>Tu</span>
+          <span>Th</span>
+          <span>Sa</span>
         </div>
 
-        <div style={{ display: 'flex', gap: 6 }}>
-          {/* Day of week labels */}
-          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: 88, fontSize: 9, color: 'var(--text-tertiary)', paddingRight: 4, width: 20 }}>
-            <span>Su</span>
-            <span>Tu</span>
-            <span>Th</span>
-            <span>Sa</span>
+        {/* Scrollable area for Month Labels + Grid */}
+        <div style={{ display: 'flex', flexDirection: 'column', overflowX: 'auto', flex: 1, paddingBottom: 6 }}>
+          {/* Month Labels row */}
+          <div style={{ display: 'flex', position: 'relative', height: 16, fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 500, marginBottom: 4, width: `${stats.weeks.length * 13}px` }}>
+            {stats.monthLabels.map((label, idx) => (
+              <span
+                key={idx}
+                style={{
+                  position: 'absolute',
+                  left: `${label.colIndex * 13}px`,
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {label.text}
+              </span>
+            ))}
           </div>
 
           {/* Grid columns (weeks) */}
-          <div style={{ display: 'flex', gap: 3, overflowX: 'auto', paddingBottom: 4 }}>
+          <div style={{ display: 'flex', gap: 3 }}>
             {stats.weeks.map((week, wi) => (
               <div className="heatmap-week-col" key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {week.map((day, di) => (
