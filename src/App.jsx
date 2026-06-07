@@ -42,6 +42,13 @@ import {
 } from 'firebase/firestore';
 import { initDbSync, deleteUserCloudData, clearAllLocalStores } from './services/dbSync.js';
 
+const formatLocalDate = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 // Custom Youtube SVG Icon since brand icons are not exported in this lucide-react version
 const Youtube = ({ size = 24, fill = "currentColor", ...props }) => (
   <svg
@@ -379,7 +386,7 @@ function Sidebar({ isOpen, onClose }) {
 
   // Compute due count directly from active profile's revisions to optimize renders and prevent loops
   const dueCount = useRevisionStore((s) => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = formatLocalDate();
     const profileRevisions = s.profiles[s.activeProfileId] || {};
     return Object.values(profileRevisions).filter(
       (rev) => rev.nextRevisionDate && rev.nextRevisionDate <= today && !rev.completed
@@ -924,39 +931,37 @@ function Heatmap() {
     return ['Current', ...sorted];
   }, [dailySolves]);
 
+  const getMonthName = (mIndex) => {
+    const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return names[mIndex];
+  };
+
   const stats = useMemo(() => {
     const today = new Date();
     let startDate, endDate;
-    let monthsToShow = [];
 
     if (selectedYear === 'Current') {
+      endDate = today;
       startDate = new Date(today);
       startDate.setDate(today.getDate() - 364);
-      endDate = today;
-
-      let curYear = today.getFullYear();
-      let curMonth = today.getMonth();
-      for (let i = 11; i >= 0; i--) {
-        let m = curMonth - i;
-        let y = curYear;
-        if (m < 0) {
-          m += 12;
-          y -= 1;
-        }
-        monthsToShow.push({ year: y, month: m });
-      }
     } else {
       const yearNum = parseInt(selectedYear);
       startDate = new Date(yearNum, 0, 1);
       endDate = new Date(yearNum, 11, 31);
-
-      for (let m = 0; m < 12; m++) {
-        monthsToShow.push({ year: yearNum, month: m });
-      }
     }
 
-    const startStr = startDate.toISOString().split('T')[0];
-    const endStr = endDate.toISOString().split('T')[0];
+    // Align startDate to the previous Sunday
+    const startDay = startDate.getDay();
+    const adjustedStart = new Date(startDate);
+    adjustedStart.setDate(adjustedStart.getDate() - startDay);
+
+    // Align endDate to the following Saturday
+    const endDay = endDate.getDay();
+    const adjustedEnd = new Date(endDate);
+    adjustedEnd.setDate(adjustedEnd.getDate() + (6 - endDay));
+
+    const startStr = formatLocalDate(adjustedStart);
+    const endStr = formatLocalDate(adjustedEnd);
 
     let totalSubmissions = 0;
     const activeDates = new Set();
@@ -972,9 +977,9 @@ function Heatmap() {
 
     let maxStreak = 0;
     let currentStreak = 0;
-    const tempDate = new Date(startDate);
-    while (tempDate <= endDate) {
-      const dateStr = tempDate.toISOString().split('T')[0];
+    const tempDate = new Date(adjustedStart);
+    while (tempDate <= adjustedEnd) {
+      const dateStr = formatLocalDate(tempDate);
       if (dailySolves[dateStr] > 0) {
         currentStreak++;
         if (currentStreak > maxStreak) {
@@ -986,50 +991,51 @@ function Heatmap() {
       tempDate.setDate(tempDate.getDate() + 1);
     }
 
-    return {
-      totalSubmissions,
-      activeDays: activeDaysCount,
-      maxStreak,
-      monthsToShow,
-    };
-  }, [selectedYear, dailySolves]);
-
-  const getMonthName = (mIndex) => {
-    const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return names[mIndex];
-  };
-
-  const getMonthWeeks = (year, month) => {
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const numDays = lastDay.getDate();
-    const startDayOfWeek = firstDay.getDay();
-
+    // Generate weeks
     const days = [];
-    for (let i = 0; i < startDayOfWeek; i++) {
-      days.push(null);
-    }
-    for (let d = 1; d <= numDays; d++) {
-      const date = new Date(year, month, d);
-      const dateStr = date.toISOString().split('T')[0];
+    const dateCursor = new Date(adjustedStart);
+    while (dateCursor <= adjustedEnd) {
+      const dateStr = formatLocalDate(dateCursor);
       const count = dailySolves[dateStr] || 0;
       days.push({
         date: dateStr,
-        dayNum: d,
+        dayOfWeek: dateCursor.getDay(),
+        month: dateCursor.getMonth(),
+        year: dateCursor.getFullYear(),
+        dayNum: dateCursor.getDate(),
         count,
         level: count === 0 ? 0 : count <= 1 ? 1 : count <= 3 ? 2 : count <= 5 ? 3 : 4,
       });
-    }
-    while (days.length % 7 !== 0) {
-      days.push(null);
+      dateCursor.setDate(dateCursor.getDate() + 1);
     }
 
     const weeks = [];
     for (let i = 0; i < days.length; i += 7) {
       weeks.push(days.slice(i, i + 7));
     }
-    return weeks;
-  };
+
+    // Determine month labels position
+    const monthLabels = [];
+    let lastMonth = -1;
+    weeks.forEach((week, weekIndex) => {
+      const firstDayOfWeek = week[0];
+      if (firstDayOfWeek && firstDayOfWeek.month !== lastMonth) {
+        monthLabels.push({
+          text: getMonthName(firstDayOfWeek.month),
+          colIndex: weekIndex
+        });
+        lastMonth = firstDayOfWeek.month;
+      }
+    });
+
+    return {
+      totalSubmissions,
+      activeDays: activeDaysCount,
+      maxStreak,
+      weeks,
+      monthLabels
+    };
+  }, [selectedYear, dailySolves]);
 
   return (
     <div className="heatmap-card animate-fade-in">
@@ -1059,57 +1065,82 @@ function Heatmap() {
         </div>
       </div>
 
-      <div className="heatmap-grid-outer">
-        <div className="heatmap-months-row">
-          {stats.monthsToShow.map(({ year, month }) => {
-            const weeks = getMonthWeeks(year, month);
-            return (
-              <div className="heatmap-month-column" key={`${year}-${month}`}>
-                <div className="heatmap-month-weeks-grid">
-                  {weeks.map((week, wi) => (
-                    <div className="heatmap-week-col" key={wi}>
-                      {week.map((day, di) => (
-                        day ? (
-                          <div
-                            key={di}
-                            className="heatmap-day-node"
-                            data-level={day.level}
-                            title={`${day.date}: ${day.count} problems solved`}
-                          />
-                        ) : (
-                          <div key={di} className="heatmap-day-node empty" />
-                        )
-                      ))}
-                    </div>
-                  ))}
-                </div>
-                <div className="heatmap-month-text">{getMonthName(month)}</div>
-              </div>
-            );
-          })}
+      <div className="heatmap-grid-outer" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {/* Month Labels row */}
+        <div style={{ display: 'flex', position: 'relative', height: 16, fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 500, margin: '0 0 4px 24px' }}>
+          {stats.monthLabels.map((label, idx) => (
+            <span
+              key={idx}
+              style={{
+                position: 'absolute',
+                left: `${label.colIndex * 13}px`,
+                transform: 'translateX(0%)',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {label.text}
+            </span>
+          ))}
         </div>
 
+        <div style={{ display: 'flex', gap: 6 }}>
+          {/* Day of week labels */}
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: 88, fontSize: 9, color: 'var(--text-tertiary)', paddingRight: 4, width: 20 }}>
+            <span>Su</span>
+            <span>Tu</span>
+            <span>Th</span>
+            <span>Sa</span>
+          </div>
+
+          {/* Grid columns (weeks) */}
+          <div style={{ display: 'flex', gap: 3, overflowX: 'auto', paddingBottom: 4 }}>
+            {stats.weeks.map((week, wi) => (
+              <div className="heatmap-week-col" key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {week.map((day, di) => (
+                  <div
+                    key={di}
+                    className="heatmap-day-node"
+                    data-level={day.level}
+                    title={`${day.date}: ${day.count} problems solved`}
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: 2,
+                      background: day.level === 0 ? 'var(--bg-tertiary)' :
+                                  day.level === 1 ? 'var(--heatmap-1)' :
+                                  day.level === 2 ? 'var(--heatmap-2)' :
+                                  day.level === 3 ? 'var(--heatmap-3)' : 'var(--heatmap-4)',
+                    }}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
         {/* Legend Stack */}
-        <div className="heatmap-legend-vert-stack" title="Color Legend">
-          <div className="heatmap-legend-item">
-            <div className="heatmap-legend-square" style={{ background: 'var(--heatmap-4)' }} />
-            <span className="heatmap-legend-label">6+ solves</span>
+        <div className="heatmap-legend-vert-stack" title="Color Legend" style={{ display: 'flex', flexDirection: 'row', gap: 12, margin: 0 }}>
+          <div className="heatmap-legend-item" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div className="heatmap-legend-square" style={{ background: 'var(--bg-tertiary)', width: 10, height: 10, borderRadius: 2 }} />
+            <span className="heatmap-legend-label" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>0 solves</span>
           </div>
-          <div className="heatmap-legend-item">
-            <div className="heatmap-legend-square" style={{ background: 'var(--heatmap-3)' }} />
-            <span className="heatmap-legend-label">4-5 solves</span>
+          <div className="heatmap-legend-item" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div className="heatmap-legend-square" style={{ background: 'var(--heatmap-1)', width: 10, height: 10, borderRadius: 2 }} />
+            <span className="heatmap-legend-label" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>1 solve</span>
           </div>
-          <div className="heatmap-legend-item">
-            <div className="heatmap-legend-square" style={{ background: 'var(--heatmap-2)' }} />
-            <span className="heatmap-legend-label">2-3 solves</span>
+          <div className="heatmap-legend-item" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div className="heatmap-legend-square" style={{ background: 'var(--heatmap-2)', width: 10, height: 10, borderRadius: 2 }} />
+            <span className="heatmap-legend-label" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>2-3 solves</span>
           </div>
-          <div className="heatmap-legend-item">
-            <div className="heatmap-legend-square" style={{ background: 'var(--heatmap-1)' }} />
-            <span className="heatmap-legend-label">1 solve</span>
+          <div className="heatmap-legend-item" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div className="heatmap-legend-square" style={{ background: 'var(--heatmap-3)', width: 10, height: 10, borderRadius: 2 }} />
+            <span className="heatmap-legend-label" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>4-5 solves</span>
           </div>
-          <div className="heatmap-legend-item">
-            <div className="heatmap-legend-square" style={{ background: 'var(--bg-tertiary)' }} />
-            <span className="heatmap-legend-label">0 solves</span>
+          <div className="heatmap-legend-item" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div className="heatmap-legend-square" style={{ background: 'var(--heatmap-4)', width: 10, height: 10, borderRadius: 2 }} />
+            <span className="heatmap-legend-label" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>6+ solves</span>
           </div>
         </div>
       </div>
@@ -1142,7 +1173,7 @@ function DashboardPage() {
   }, [allQuestions, questionStatus]);
 
   const dueRevisionsList = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = formatLocalDate();
     return Object.entries(revisions)
       .filter(([, rev]) => rev.nextRevisionDate && rev.nextRevisionDate <= today && !rev.completed)
       .map(([id, rev]) => ({ questionId: parseInt(id), ...rev }));
@@ -1809,7 +1840,7 @@ function RevisionPage() {
   const allQuestions = useAllQuestions();
 
   const { dueRevisions, upcomingRevisions } = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = formatLocalDate();
     const due = [];
     const upcoming = [];
     Object.entries(revisions).forEach(([id, rev]) => {
@@ -2053,7 +2084,7 @@ function ProfileManagerModal({ onClose }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `dsa_master_backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `dsa_master_backup_${formatLocalDate()}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -4596,7 +4627,7 @@ function ProfilePage({ user, syncStatus, onLogout }) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `dsa_mastery_backup_${activeProfileId}_${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `dsa_mastery_backup_${activeProfileId}_${formatLocalDate()}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
