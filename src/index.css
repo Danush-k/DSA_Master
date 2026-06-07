@@ -853,6 +853,16 @@ input:focus, textarea:focus, select:focus {
   z-index: 100;
   box-shadow: var(--shadow-md);
 }
+.heatmap-help-link {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+.heatmap-help-link:hover {
+  color: var(--accent-primary);
+  text-decoration: underline;
+}
 
 /* Streak */
 .streak-container {

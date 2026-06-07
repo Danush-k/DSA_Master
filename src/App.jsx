@@ -1018,14 +1018,18 @@ function Heatmap() {
     // Determine month labels position
     const monthLabels = [];
     let lastMonth = -1;
+    let lastColIndex = -10;
     weeks.forEach((week, weekIndex) => {
       const firstDayOfWeek = week[0];
       if (firstDayOfWeek && firstDayOfWeek.month !== lastMonth) {
-        monthLabels.push({
-          text: getMonthName(firstDayOfWeek.month),
-          colIndex: weekIndex
-        });
-        lastMonth = firstDayOfWeek.month;
+        if (weekIndex - lastColIndex >= 3) {
+          monthLabels.push({
+            text: getMonthName(firstDayOfWeek.month),
+            colIndex: weekIndex
+          });
+          lastMonth = firstDayOfWeek.month;
+          lastColIndex = weekIndex;
+        }
       }
     });
 
@@ -1129,7 +1133,16 @@ function Heatmap() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+        <a 
+          href="https://docs.github.com/en/github/setting-up-and-managing-your-github-profile/managing-contribution-graphs-on-your-profile/why-are-my-contributions-not-showing-up-on-my-profile" 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="heatmap-help-link"
+        >
+          Learn how we count contributions
+        </a>
+
         {/* Legend Stack */}
         <div className="heatmap-legend-vert-stack" title="Color Legend" style={{ display: 'flex', flexDirection: 'row', gap: 12, margin: 0 }}>
           <div className="heatmap-legend-item" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
