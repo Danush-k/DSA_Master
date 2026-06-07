@@ -102,20 +102,41 @@ const useProgressStore = create(
             newStatus[questionId] = status;
           }
 
-          let { currentStreak, longestStreak, lastSolveDate } = profile;
-          if (status === 'solved' && current !== status) {
-            const yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
-            const yesterdayStr = yesterday.toISOString().split('T')[0];
+          // Recalculate streak from dailySolves
+          const sortedDates = Object.keys(newDailySolves)
+            .filter(date => newDailySolves[date] > 0)
+            .sort();
 
-            if (lastSolveDate === yesterdayStr) {
-              currentStreak += 1;
-            } else if (lastSolveDate !== today) {
+          let lastSolveDate = null;
+          let currentStreak = 0;
+
+          if (sortedDates.length > 0) {
+            const lastDateStr = sortedDates[sortedDates.length - 1];
+            const todayDate = new Date(today);
+            const lastDate = new Date(lastDateStr);
+            const diffTime = Math.abs(todayDate - lastDate);
+            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffDays <= 1) {
+              lastSolveDate = lastDateStr;
               currentStreak = 1;
+              let checkDate = new Date(lastDate);
+              while (true) {
+                checkDate.setDate(checkDate.getDate() - 1);
+                const checkDateStr = checkDate.toISOString().split('T')[0];
+                if (newDailySolves[checkDateStr] > 0) {
+                  currentStreak++;
+                } else {
+                  break;
+                }
+              }
+            } else {
+              lastSolveDate = lastDateStr;
+              currentStreak = 0;
             }
-            lastSolveDate = today;
-            longestStreak = Math.max(longestStreak, currentStreak);
           }
+
+          const longestStreak = Math.max(profile.longestStreak || 0, currentStreak);
 
           return {
             profiles: {
