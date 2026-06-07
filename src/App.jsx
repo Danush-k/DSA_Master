@@ -1072,13 +1072,16 @@ function Heatmap() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, width: '100%', alignItems: 'flex-start', margin: '12px 0 0 0' }}>
+      <div style={{ display: 'flex', gap: 6, width: '100%', alignItems: 'flex-start', margin: '12px 0 0 0' }}>
         {/* Day of week labels */}
-        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: 88, fontSize: 9, color: 'var(--text-tertiary)', paddingTop: 20, width: 20, flexShrink: 0 }}>
-          <span>Su</span>
-          <span>Tu</span>
-          <span>Th</span>
-          <span>Sa</span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, fontSize: 9, color: 'var(--text-tertiary)', paddingTop: 20, width: 15, flexShrink: 0 }}>
+          <span style={{ height: 10, lineHeight: '10px' }}>Su</span>
+          <span style={{ height: 10, lineHeight: '10px', visibility: 'hidden' }}>Mo</span>
+          <span style={{ height: 10, lineHeight: '10px' }}>Tu</span>
+          <span style={{ height: 10, lineHeight: '10px', visibility: 'hidden' }}>We</span>
+          <span style={{ height: 10, lineHeight: '10px' }}>Th</span>
+          <span style={{ height: 10, lineHeight: '10px', visibility: 'hidden' }}>Fr</span>
+          <span style={{ height: 10, lineHeight: '10px' }}>Sa</span>
         </div>
 
         {/* Scrollable area for Month Labels + Grid */}
