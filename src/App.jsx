@@ -494,7 +494,7 @@ function Header({ title, onMenuClick, onManageProfiles, syncStatus, user, onAuth
                   }}
                   className="search-result-item"
                   onMouseDown={() => {
-                    navigate(`/topics/${q.topic}`);
+                    navigate(`/topics/${q.topic}#question-${q.id}`);
                     setSearchQuery('');
                   }}
                 >
@@ -709,7 +709,7 @@ function QuestionRow({ q, showTopic = false, showPattern = true }) {
 
   return (
     <>
-      <tr>
+      <tr id={`question-${q.id}`}>
         <td>
           <button
             className={`question-status ${status || ''}`}
@@ -1342,12 +1342,29 @@ function TopicsPage() {
 // ═══════════════════════════════════════════════════════════════
 function TopicDetailPage() {
   const { topicId } = useParams();
+  const location = useLocation();
   const activeProfileId = useProgressStore((s) => s.activeProfileId);
   const questionStatus = useProgressStore(useShallow((s) => s.profiles[activeProfileId]?.questionStatus || {}));
   const topic = topics.find(t => t.id === topicId);
   const allQuestions = useAllQuestions();
   const topicQs = useMemo(() => allQuestions.filter(q => q.topic === topicId), [allQuestions, topicId]);
   const solved = topicQs.filter(q => questionStatus[q.id] === 'solved').length;
+
+  useEffect(() => {
+    if (location.hash) {
+      const id = location.hash.substring(1);
+      setTimeout(() => {
+        const element = document.getElementById(id);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.classList.add('highlight-row');
+          setTimeout(() => {
+            element.classList.remove('highlight-row');
+          }, 2000);
+        }
+      }, 100);
+    }
+  }, [location]);
 
   const diffCounts = useMemo(() => ({
     easy: topicQs.filter(q => q.difficulty === 'Easy').length,

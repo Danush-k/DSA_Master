@@ -2902,5 +2902,13 @@ input:focus, textarea:focus, select:focus {
   margin: 0;
 }
 
+/* Custom Row Highlight styling */
+.highlight-row {
+  background-color: var(--accent-glow) !important;
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
+
 
 
