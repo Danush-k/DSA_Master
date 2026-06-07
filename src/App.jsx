@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { HashRouter, Routes, Route, Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
@@ -443,6 +443,19 @@ function Header({ title, onMenuClick, onManageProfiles, syncStatus, user, onAuth
   const [searchQuery, setSearchQuery] = useState('');
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const navigate = useNavigate();
+  const profileRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setProfileDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const activeProfileId = useProgressStore((s) => s.activeProfileId);
   const profiles = useProgressStore(useShallow((s) => s.profiles));
@@ -510,7 +523,7 @@ function Header({ title, onMenuClick, onManageProfiles, syncStatus, user, onAuth
         </div>
 
         {/* Profile Selector */}
-        <div style={{ position: 'relative' }}>
+        <div ref={profileRef} style={{ position: 'relative' }}>
           <button className="profile-btn" onClick={() => setProfileDropdownOpen(!profileDropdownOpen)} title="Switch profile" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {renderAvatar(activeProfile?.avatar, activeProfile?.name, 22)}
             <span className="profile-btn-name">{activeProfile?.name || 'Default'}</span>
