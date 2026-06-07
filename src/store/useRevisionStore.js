@@ -47,8 +47,8 @@ const useRevisionStore = create(
           const existing = revisions[questionId];
           const today = new Date().toISOString().split('T')[0];
 
-          if (existing && existing.revisionCount >= REVISION_INTERVALS.length) {
-            return state; // All revisions complete
+          if (existing) {
+            return state; // Already scheduled/in progress or completed
           }
 
           const revisionCount = 0;
