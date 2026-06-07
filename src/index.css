@@ -711,6 +711,8 @@ input:focus, textarea:focus, select:focus {
   border: 1px solid var(--border-primary);
   box-shadow: var(--shadow-sm);
   transition: all var(--transition-normal);
+  max-width: 755px;
+  width: 100%;
 }
 .heatmap-header {
   display: flex;
