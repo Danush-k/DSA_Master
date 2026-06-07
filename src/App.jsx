@@ -708,6 +708,7 @@ function QuestionRow({ q, showTopic = false, showPattern = true }) {
     return note && Object.entries(note).some(([k, v]) => v && v !== '' && k !== 'updatedAt');
   });
   const scheduleRevision = useRevisionStore((s) => s.scheduleRevision);
+  const removeRevision = useRevisionStore((s) => s.removeRevision);
   const revision = useRevisionStore((s) => s.profiles[s.activeProfileId]?.[q.id] || null);
   const [notesOpen, setNotesOpen] = useState(false);
 
@@ -717,6 +718,7 @@ function QuestionRow({ q, showTopic = false, showPattern = true }) {
       scheduleRevision(q.id);
     } else {
       toggleStatus(q.id, 'solved');
+      removeRevision(q.id);
     }
   };
 
@@ -1800,6 +1802,7 @@ function PatternDetailPage() {
 // ═══════════════════════════════════════════════════════════════
 function RevisionPage() {
   const activeProfileId = useProgressStore((s) => s.activeProfileId);
+  const questionStatus = useProgressStore(useShallow((s) => s.profiles[activeProfileId]?.questionStatus || {}));
   const revisions = useRevisionStore(useShallow((s) => s.profiles[activeProfileId] || {}));
   const completeRevision = useRevisionStore((s) => s.completeRevision);
 
@@ -1810,6 +1813,7 @@ function RevisionPage() {
     const due = [];
     const upcoming = [];
     Object.entries(revisions).forEach(([id, rev]) => {
+      if (questionStatus[id] !== 'solved') return;
       if (rev.completed) return;
       if (!rev.nextRevisionDate) return;
       const item = { questionId: parseInt(id), ...rev };
@@ -2664,6 +2668,7 @@ function ConceptCard({ step, allQuestions, questionStatus }) {
   const lc = LEVEL_CONFIG[step.level];
   const toggleStatus = useProgressStore((s) => s.toggleStatus);
   const scheduleRevision = useRevisionStore((s) => s.scheduleRevision);
+  const removeRevision = useRevisionStore((s) => s.removeRevision);
 
   const handleCheckClick = (qId, isSolved) => {
     if (!isSolved) {
@@ -2671,6 +2676,7 @@ function ConceptCard({ step, allQuestions, questionStatus }) {
       scheduleRevision(qId);
     } else {
       toggleStatus(qId, 'solved');
+      removeRevision(qId);
     }
   };
 

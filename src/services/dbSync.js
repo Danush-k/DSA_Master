@@ -170,15 +170,19 @@ export function initDbSync(onStatusChange) {
 
       if (JSON.stringify(rev) !== JSON.stringify(prevRev)) {
         const docId = `${authUser.uid}_${activeProfileId}_${numId}`;
-        await setDoc(doc(db, 'user_revisions', docId), {
-          userId: authUser.uid,
-          profileKey: activeProfileId,
-          questionId: numId,
-          revisionCount: rev?.revisionCount || 0,
-          nextRevisionDate: rev?.nextRevisionDate || null,
-          completed: rev?.completed || false,
-          updatedAt: new Date().toISOString()
-        });
+        if (!rev) {
+          await deleteDoc(doc(db, 'user_revisions', docId));
+        } else {
+          await setDoc(doc(db, 'user_revisions', docId), {
+            userId: authUser.uid,
+            profileKey: activeProfileId,
+            questionId: numId,
+            revisionCount: rev?.revisionCount || 0,
+            nextRevisionDate: rev?.nextRevisionDate || null,
+            completed: rev?.completed || false,
+            updatedAt: new Date().toISOString()
+          });
+        }
       }
     }
   });
@@ -449,11 +453,16 @@ async function hydrateFromCloud(user) {
       const row = docSnap.data();
       const pk = row.profileKey;
       if (!revisionStoreState.profiles[pk]) revisionStoreState.profiles[pk] = {};
-      revisionStoreState.profiles[pk][row.questionId] = {
-        revisionCount: row.revisionCount,
-        nextRevisionDate: row.nextRevisionDate,
-        completed: row.completed
-      };
+      
+      // Only hydrate if the question is currently solved!
+      const status = progressStoreState.profiles[pk]?.questionStatus[row.questionId];
+      if (status === 'solved') {
+        revisionStoreState.profiles[pk][row.questionId] = {
+          revisionCount: row.revisionCount,
+          nextRevisionDate: row.nextRevisionDate,
+          completed: row.completed
+        };
+      }
     });
 
     // Set updated Zustand store states — new object references guarantee re-renders
