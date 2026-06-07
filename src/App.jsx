@@ -916,6 +916,7 @@ function QuestionTable({ questionList, showTopic = false, showPattern = true }) 
 function Heatmap() {
   const dailySolves = useProgressStore(useShallow((s) => s.profiles[s.activeProfileId]?.dailySolves || {}));
   const [selectedYear, setSelectedYear] = useState('Current');
+  const scrollRef = useRef(null);
 
   // Compute list of years from dailySolves
   const years = useMemo(() => {
@@ -1037,6 +1038,12 @@ function Heatmap() {
     };
   }, [selectedYear, dailySolves]);
 
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+    }
+  }, [selectedYear, stats.weeks]);
+
   return (
     <div className="heatmap-card animate-fade-in">
       <div className="heatmap-header">
@@ -1075,7 +1082,7 @@ function Heatmap() {
         </div>
 
         {/* Scrollable area for Month Labels + Grid */}
-        <div style={{ display: 'flex', flexDirection: 'column', overflowX: 'auto', flex: 1, paddingBottom: 6 }}>
+        <div ref={scrollRef} style={{ display: 'flex', flexDirection: 'column', overflowX: 'auto', flex: 1, paddingBottom: 6 }}>
           {/* Month Labels row */}
           <div style={{ display: 'flex', position: 'relative', height: 16, fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 500, marginBottom: 4, width: `${stats.weeks.length * 13}px` }}>
             {stats.monthLabels.map((label, idx) => (
