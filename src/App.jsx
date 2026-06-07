@@ -2864,7 +2864,7 @@ function RoadmapPage() {
       }
       return true;
     }),
-    [filterLevel, filterTopic, searchQuery]
+    [filterLevel, filterTopic, searchQuery, allQuestions, questionStatus]
   );
 
   const groupedByTopic = useMemo(() => {
