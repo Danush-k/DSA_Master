@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { HashRouter, Routes, Route, Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
@@ -3103,7 +3103,7 @@ function LoginPage({ user }) {
   const [userIdForSignup, setUserIdForSignup] = useState('');
   const [emailForSignup, setEmailForSignup] = useState('');
 
-  const checkUserMapping = async (currentUser) => {
+  const checkUserMapping = useCallback(async (currentUser) => {
     if (!currentUser) return;
     setCheckingUserId(true);
     try {
@@ -3160,13 +3160,13 @@ function LoginPage({ user }) {
     } finally {
       setCheckingUserId(false);
     }
-  };
+  }, [navigate]);
 
   useEffect(() => {
     if (user && !needsUserId) {
       checkUserMapping(user);
     }
-  }, [user, needsUserId, navigate]);
+  }, [user, needsUserId, checkUserMapping]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
