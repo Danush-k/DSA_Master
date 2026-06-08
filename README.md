@@ -1,126 +1,141 @@
-# DSA Mastery — Pattern-Based Interview Preparation
+# DSA Mastery
 
-DSA Mastery is a modern, responsive React web application designed to help software engineers systematically prepare for technical interviews using pattern-based tracking, smart revision intervals, and daily solved streak logs.
+[![React](https://img.shields.io/badge/React-19.0.0-61DAFB?logo=react&logoColor=white&style=flat-square)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-8.0.12-646CFF?logo=vite&logoColor=white&style=flat-square)](https://vitejs.dev/)
+[![Firebase](https://img.shields.io/badge/Firebase-12.14.0-FFCA28?logo=firebase&logoColor=black&style=flat-square)](https://firebase.google.com/)
+[![Zustand](https://img.shields.io/badge/Zustand-5.0.14-8A63D2?style=flat-square)](https://github.com/pmndrs/zustand)
+[![Eslint](https://img.shields.io/badge/Linter-ESLint-4B32C3?logo=eslint&logoColor=white&style=flat-square)](https://eslint.org/)
 
-![DSA Mastery Database Schema](public/database_er_diagram.png)
-
-## Core Features
-
-- 🎯 **Pattern-Based Tracking:** Questions are grouped by patterns (e.g., Two Pointers, Sliding Window, DFS) for more efficient mental mapping.
-- 📈 **GitHub-Style Solve Heatmap:** Visualizes daily solved stats over years to maintain streaks.
-- ⏰ **Smart Revision Scheduler:** Spaced-repetition scheduling intervals (1, 3, 7, 15, 30 days) to lock in problem-solving logic.
-- 📝 **Rich Problem Notes:** Add detailed insights, optimal complexity benchmarks (Time/Space), pitfalls, and code snippets directly on each problem.
-- ➕ **Custom Question Creator:** Create and tag your own interview questions with difficulty, topics, importance, and company tags.
-- 🛡️ **Firebase Security Integration:** Fine-grained security rule restrictions keeping your workspace completely private and secure.
+DSA Mastery is a high-performance, developer-centric React application engineered to help software engineers systematically prepare for technical interviews. The platform integrates pattern-based tracking, automated spaced-repetition scheduling, and real-time cloud synchronization to deliver an optimal preparation workflow.
 
 ---
 
-## Architecture & Database Structure
+## 🎯 Key Features
 
-The project has been refactored to use a professional, query-optimized, and clean database schema built on **Google Cloud Firestore**:
-
-1. **`users` (Doc ID: `uid`):** Holds the primary user record, including email, username, avatar, current/longest streaks, and aggregated solve statistics (such as `dailySolves` and `solveHistory`). Consolidating these fields directly inside the user document eliminates the need for separate profile queries.
-2. **`usernames` (Doc ID: lowercase `username`):** A registry table mapping usernames to UIDs. This guarantees global uniqueness and enables O(1) checks during signup or username edits without database scans.
-3. **User Workspace Data (Doc ID: `${uid}_${questionId}`):** Solve statuses (`user_progress`), key-idea notes (`user_notes`), revisions (`user_revisions`), and custom questions (`custom_questions`) are tracked cleanly under direct paths, removing redundant profile fields.
+- **Pattern-Based Tracking:** Groups algorithmic problems into foundational mental models (e.g., Two Pointers, Sliding Window, Fast & Slow Pointers, DFS/BFS) rather than arbitrary lists, optimizing conceptual retention.
+- **Automated Spaced-Repetition Scheduler:** Implements structured revision intervals (1, 3, 7, 15, and 30 days) based on cognitive science principles, prompting reviews of solved questions to lock in problem-solving intuition.
+- **GitHub-Style Solve Heatmap:** Provides a visual, calendar-based activity matrix mapping daily solve statistics to cultivate consistency and track streaks.
+- **Rich Interactive Workspace:** Allows developers to document key insights, optimal time/space complexity benchmarks, potential pitfalls, and clean code snippets directly on each problem.
+- **Custom Question Registry:** Enables users to extend the default problem set by registering custom interview questions tagged with difficulty, algorithmic topics, target companies, and urgency levels.
+- **Real-Time Cloud Sync & Offline Support:** Combines local Zustand store state persistence with background Firebase Firestore sync, enabling seamless transitions between online and offline states.
 
 ---
 
-### Database Entity Relationship (ER) Diagram (Mermaid)
+## 📁 Directory Structure
 
-```mermaid
-erDiagram
-    users {
-        string uid PK "Firebase Auth UID"
-        string username "Reserved Username"
-        string email "Email address"
-        string name "Display Name"
-        string avatar "Avatar representation"
-        int currentStreak "Solve streak"
-        int longestStreak "Max solved streak"
-        string lastSolveDate "YYYY-MM-DD"
-        map dailySolves "date -> count"
-        array solveHistory "recent solves"
-        string createdAt "ISO Date"
-        string updatedAt "ISO Date"
-    }
+A walk-through of the main codebase directory tree:
 
-    usernames {
-        string username PK "Lowercase lookup key"
-        string uid "User UID"
-    }
-
-    user_progress {
-        string docId PK "format: uid_questionId"
-        string uid "User UID"
-        int questionId "Question ID"
-        string status "solved / attempting / null"
-        boolean bookmarked "Bookmarks indicator"
-        string updatedAt "ISO Date"
-    }
-
-    user_notes {
-        string docId PK "format: uid_questionId"
-        string uid "User UID"
-        int questionId "Question ID"
-        string keyIdea "Key Idea note"
-        string mistakes "Pitfalls notes"
-        string optimalApproach "Approach notes"
-        string timeComplexity "e.g., O(N)"
-        string spaceComplexity "e.g., O(1)"
-        string notes "Additional notes"
-        string interviewLearnings "Interview tips"
-        string code "Code snippet"
-        string why "Approach notes"
-        string updatedAt "ISO Date"
-    }
-
-    user_revisions {
-        string docId PK "format: uid_questionId"
-        string uid "User UID"
-        int questionId "Question ID"
-        int revisionCount "Interval count"
-        string nextRevisionDate "YYYY-MM-DD"
-        boolean completed "Is review finished"
-        string updatedAt "ISO Date"
-    }
-
-    custom_questions {
-        string docId PK "format: uid_questionId"
-        string uid "User UID"
-        int id "Question ID"
-        string num "Question identifier"
-        string title "Question Title"
-        string url "Link to problem"
-        string videoUrl "Video link"
-        string difficulty "Easy / Medium / Hard"
-        string topic "DSA Topic"
-        string pattern "Algorithm pattern"
-        string importance "Importance level"
-        string why "Notes on why to solve"
-        array companies "Target companies"
-        string createdAt "ISO Date"
-    }
-
-    usernames |o--|| users : "registers"
-    user_progress }o--|| users : "tracks"
-    users ||--o{ user_notes : "creates"
-    users ||--o{ user_revisions : "schedules"
-    custom_questions }o--|| users : "creates"
+```text
+dsa-sheet/
+├── .env                    # Local environment variables configuration
+├── firestore.rules         # Security access control rules for Firestore
+├── index.html              # Single Page Application root markup
+├── vite.config.js          # Vite build and plugin configurations
+├── src/
+│   ├── main.jsx            # Application entrypoint
+│   ├── App.jsx             # Core router and component container layout
+│   ├── index.css           # Global design system tokens and UI styling
+│   ├── firebaseClient.js   # Initialization of Firebase App, Auth, and Firestore
+│   ├── data/               # Static dataset declarations
+│   │   ├── patterns.js     # Definitions for algorithm patterns
+│   │   ├── questions.js    # Master list of curated interview questions
+│   │   ├── roadmap.js      # Structured topic sequence and guide data
+│   │   └── topics.js       # Mapping of DSA topics
+│   ├── services/           # External service integration logic
+│   │   └── dbSync.js       # Real-time state syncing wrapper between Zustand & Firestore
+│   └── store/              # Global state managers powered by Zustand
+│       ├── useNotesStore.js     # State persistence for problem workspace notes
+│       ├── useProgressStore.js  # State manager for user status, bookmarks, and streaks
+│       ├── useRevisionStore.js  # Scheduler logic for upcoming/due reviews
+│       └── useThemeStore.js     # Management of light/dark theme preference
+└── public/                 # Static assets directory
 ```
 
 ---
 
-## Security Architecture
+## 💻 Tech Stack & Architecture Rationale
 
-1. **Authentication:** Managed securely via **Firebase Authentication** servers. User passwords are automatically hashed with Google's specialized cryptographic algorithms (such as `scrypt`) and are never exposed or saved to Firestore collections.
-2. **Access Control:** Deployed rules inside `firestore.rules` protect document scopes:
-   - User profile writes are restricted strictly to the document owner (`request.auth.uid == uid`).
-   - Progress, notes, revisions, and custom questions can only be accessed or modified by their owner (`resource.data.uid == request.auth.uid`).
+### Frontend Layer
+- **React 19 & React Router DOM 7:** Utilizes React's latest engine for rendering optimization and declarative route management.
+- **Zustand 5:** Chosen for high-performance, boilerplate-free state management. It handles client-side updates instantly and persists data locally inside `localStorage` for zero-latency startups.
+
+### Cloud Backend Layer
+- **Firebase Authentication:** Handles password verification, session tokens, and user sign-ups securely. Sensitive credentials never hit application databases.
+- **Cloud Firestore:** A scalable document database that acts as a secure, real-time persistence layer. Firestore's client SDK allows offline caching and seamless synchronization when internet connectivity changes.
+
+### State Synchronization Engine (`src/services/dbSync.js`)
+- Employs a **Local-First, Cloud-Synced** architecture. User interaction updates are applied instantaneously to the local state (Zustand), followed by non-blocking, asynchronous database writes to Firestore.
+- Handles data hydration automatically on user authentication, merging local state with cloud-stored values and healing discrepancies (e.g., re-calculating solve histories or current streaks).
 
 ---
 
-## Tech Stack
+## 🛡️ Security Architecture
 
-- **Frontend:** React, Zustand, React Router, TailwindCSS / CSS, Lucide React
-- **Build System:** Vite
-- **Cloud Backend:** Firebase Auth, Cloud Firestore
+The application implements strict document-level security rules in [firestore.rules](file:///Users/danush/Documents/Projects/DSA%20sheet/firestore.rules) to ensure data privacy:
+
+- **Users Collection (`/users/{uid}`):** Publicly readable to check profile details, but write operations are limited strictly to the authenticated document owner matching the UID.
+- **Username Reservations (`/usernames/{username}`):** Serves as a unique lookup registry preventing duplicates during sign-ups. Read-write access is restricted to the username owner, and directly modifying entries is forbidden (they must be deleted and recreated).
+- **Workspace Documents (`/user_progress`, `/user_notes`, `/user_revisions`, `/custom_questions`):** Protected by query-level filters ensuring that users can only read or write documents where `resource.data.uid == request.auth.uid`.
+
+---
+
+## 🚀 Getting Started
+
+Follow these steps to run the project locally for development:
+
+### Prerequisites
+- Node.js (version 18 or higher recommended)
+- A Firebase Project (with Email/Password Authentication and Firestore Database enabled)
+
+### Local Setup Instructions
+
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
+   cd "DSA sheet"
+   ```
+
+2. **Install project dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Configure Environment Variables:**
+   Create a `.env` file in the root directory and populate it with your Firebase project credentials:
+   ```env
+   VITE_FIREBASE_API_KEY=your_api_key
+   VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain
+   VITE_FIREBASE_PROJECT_ID=your_project_id
+   VITE_FIREBASE_STORAGE_BUCKET=your_storage_bucket
+   VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+   VITE_FIREBASE_APP_ID=your_app_id
+   ```
+
+4. **Launch the Development Server:**
+   ```bash
+   npm run dev
+   ```
+   Open your browser and navigate to the local URL (usually `http://localhost:5173`).
+
+5. **Build for Production:**
+   ```bash
+   npm run build
+   ```
+   The production-ready bundle will be outputted to the `dist` directory.
+
+---
+
+## 🛠️ Project Scripts
+
+The following npm scripts are available:
+
+- `npm run dev`: Runs the application in development mode with Hot Module Replacement (HMR).
+- `npm run build`: Compiles and optimizes the React codebase for production deployment.
+- `npm run lint`: Analyzes code quality using ESLint configured in `eslint.config.js`.
+- `npm run preview`: Statically serves the locally built production output for verification.
+
+---
+
+## 📄 License
+
+This project is private and proprietary. All rights reserved.
