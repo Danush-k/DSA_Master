@@ -1,7 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
@@ -22,4 +21,3 @@ export const db = app ? initializeFirestore(app, {
     tabManager: persistentMultipleTabManager()
   })
 }) : null;
-export const storage = app ? getStorage(app) : null;
