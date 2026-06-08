@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { StickyNote, X, Sparkles, Target, Clock, Layers, AlertTriangle, Info } from 'lucide-react';
+import { StickyNote, X, Sparkles, Target, Clock, Layers, AlertTriangle, Info, Image, Upload } from 'lucide-react';
 import useNotesStore from '../../store/useNotesStore.js';
+import { storage, auth } from '../../firebaseClient.js';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export default function NotesModal({ question, onClose }) {
   const saveNote = useNotesStore((s) => s.saveNote);
@@ -16,6 +18,65 @@ export default function NotesModal({ question, onClose }) {
     notes: existing.notes || '',
     interviewLearnings: existing.interviewLearnings || '',
   });
+
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+
+  const allImageUrls = useMemo(() => {
+    const urls = [];
+    Object.values(form).forEach((val) => {
+      if (typeof val === 'string') {
+        const regex = /!\[.*?\]\((https?:\/\/.*?)\)/g;
+        let match;
+        while ((match = regex.exec(val)) !== null) {
+          if (match[1] && !urls.includes(match[1])) {
+            urls.push(match[1]);
+          }
+        }
+      }
+    });
+    return urls;
+  }, [form]);
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!storage) {
+      setUploadError('Storage configuration is missing.');
+      return;
+    }
+    const currentUser = auth?.currentUser;
+    if (!currentUser) {
+      setUploadError('You must be logged in to upload images.');
+      return;
+    }
+
+    setUploading(true);
+    setUploadError('');
+
+    try {
+      const timestamp = Date.now();
+      const safeFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+      const filePath = `user_notes/${currentUser.uid}/${question.id}/${timestamp}_${safeFileName}`;
+      const imageRef = ref(storage, filePath);
+
+      await uploadBytes(imageRef, file);
+      const downloadUrl = await getDownloadURL(imageRef);
+
+      const markdownLink = `\n![${file.name}](${downloadUrl})\n`;
+      setForm((prev) => ({
+        ...prev,
+        notes: prev.notes + markdownLink,
+      }));
+    } catch (err) {
+      console.error('Failed to upload image:', err);
+      setUploadError('Upload failed: ' + err.message);
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
 
   const handleSave = () => {
     saveNote(question.id, form);
@@ -61,6 +122,61 @@ export default function NotesModal({ question, onClose }) {
                 />
               </div>
             ))}
+
+            {/* Image Upload field */}
+            <div className="notes-field" style={{ marginTop: 8 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Image size={14} style={{ color: 'var(--text-secondary)' }} />
+                Attach Diagram or Image
+              </label>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, margin: 0, padding: '6px 12px', fontSize: 13 }}>
+                  <Upload size={14} />
+                  {uploading ? 'Uploading Image...' : 'Choose Image File'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={uploading}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+                {uploadError && <span style={{ fontSize: 12, color: 'var(--error)' }}>{uploadError}</span>}
+              </div>
+            </div>
+
+            {/* Image Gallery */}
+            {allImageUrls.length > 0 && (
+              <div className="notes-field" style={{ marginTop: 12 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  Uploaded Note Attachments ({allImageUrls.length})
+                </label>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
+                  gap: 10,
+                  marginTop: 6,
+                  padding: 10,
+                  background: 'var(--bg-tertiary)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-secondary)'
+                }}>
+                  {allImageUrls.map((url, i) => (
+                    <div key={i} style={{ position: 'relative', aspectRatio: '1/1', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border-primary)' }}>
+                      <a href={url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', width: '100%', height: '100%' }}>
+                        <img 
+                          src={url} 
+                          alt={`Attachment ${i + 1}`} 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.2s' }}
+                          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.08)'}
+                          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                        />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <div className="modal-footer">
