@@ -14,6 +14,7 @@ import useNotesStore from './store/useNotesStore.js';
 import useRevisionStore from './store/useRevisionStore.js';
 import useThemeStore from './store/useThemeStore.js';
 import useAllQuestions from './hooks/useAllQuestions.js';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 // Dynamic imports for pages (Code Splitting)
 const DashboardPage = lazy(() => import('./pages/DashboardPage.jsx'));
@@ -174,16 +175,18 @@ function AppLayout() {
   if (!isAuthenticated) {
     return (
       <div className="app-layout auth-only">
-        <Suspense fallback={
-          <div className="lc-loading-screen">
-            <div className="lc-spinner"></div>
-          </div>
-        }>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="*" element={<LoginPage />} />
-          </Routes>
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={
+            <div className="lc-loading-screen">
+              <div className="lc-spinner"></div>
+            </div>
+          }>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="*" element={<LoginPage />} />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
         {isSigningOut && <SignOutOverlay />}
       </div>
     );
@@ -193,16 +196,18 @@ function AppLayout() {
   if (!isEmailVerified) {
     return (
       <div className="app-layout auth-only">
-        <Suspense fallback={
-          <div className="lc-loading-screen">
-            <div className="lc-spinner"></div>
-          </div>
-        }>
-          <Routes>
-            <Route path="/verify-email" element={<VerifyEmailPage user={user} onLogout={handleLogoutGlobal} />} />
-            <Route path="*" element={<VerifyEmailPage user={user} onLogout={handleLogoutGlobal} />} />
-          </Routes>
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={
+            <div className="lc-loading-screen">
+              <div className="lc-spinner"></div>
+            </div>
+          }>
+            <Routes>
+              <Route path="/verify-email" element={<VerifyEmailPage user={user} onLogout={handleLogoutGlobal} />} />
+              <Route path="*" element={<VerifyEmailPage user={user} onLogout={handleLogoutGlobal} />} />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
         {isSigningOut && <SignOutOverlay />}
       </div>
     );
@@ -222,25 +227,27 @@ function AppLayout() {
           onAuthClick={handleAuthClick}
           allQuestions={allQuestions}
         />
-        <Suspense fallback={
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-            <div className="lc-spinner"></div>
-          </div>
-        }>
-          <Routes>
-            <Route path="/" element={<DashboardPage />} />
-            <Route path="/roadmap" element={<RoadmapPage />} />
-            <Route path="/topics" element={<TopicsPage />} />
-            <Route path="/topics/:topicId" element={<TopicDetailPage />} />
-            <Route path="/sheet" element={<SheetPage />} />
-            <Route path="/patterns" element={<PatternsListPage />} />
-            <Route path="/patterns/:patternId" element={<PatternDetailPage />} />
-            <Route path="/revision" element={<RevisionPage />} />
-            <Route path="/bookmarks" element={<BookmarksPage />} />
-            <Route path="/profile" element={<ProfilePage user={user} syncStatus={syncStatus} onLogout={handleLogoutGlobal} />} />
-            <Route path="*" element={<DashboardPage />} />
-          </Routes>
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+              <div className="lc-spinner"></div>
+            </div>
+          }>
+            <Routes>
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/roadmap" element={<RoadmapPage />} />
+              <Route path="/topics" element={<TopicsPage />} />
+              <Route path="/topics/:topicId" element={<TopicDetailPage />} />
+              <Route path="/sheet" element={<SheetPage />} />
+              <Route path="/patterns" element={<PatternsListPage />} />
+              <Route path="/patterns/:patternId" element={<PatternDetailPage />} />
+              <Route path="/revision" element={<RevisionPage />} />
+              <Route path="/bookmarks" element={<BookmarksPage />} />
+              <Route path="/profile" element={<ProfilePage user={user} syncStatus={syncStatus} onLogout={handleLogoutGlobal} />} />
+              <Route path="*" element={<DashboardPage />} />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
       </div>
       {isSigningOut && <SignOutOverlay />}
       {managerOpen && <ProfileManagerModal onClose={() => setManagerOpen(false)} />}
