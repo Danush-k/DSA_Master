@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { StickyNote, X, Sparkles, Target, Clock, Layers, AlertTriangle, Info } from 'lucide-react';
 import useNotesStore from '../../store/useNotesStore.js';

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Info } from 'lucide-react';
 import useProgressStore from '../store/useProgressStore.js';
@@ -7,7 +7,7 @@ import { formatLocalDate } from '../utils/helpers.jsx';
 export default function Heatmap() {
   const dailySolves = useProgressStore(useShallow((s) => s.profiles[s.activeProfileId]?.dailySolves || {}));
   const [selectedYear, setSelectedYear] = useState('Current');
-  const scrollRef = useRef(null);
+
 
   // Compute list of years from dailySolves
   const years = useMemo(() => {

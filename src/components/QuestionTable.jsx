@@ -1,6 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { ListChecks } from 'lucide-react';
 import QuestionRow from './QuestionRow.jsx';
+
+const difficultyOrder = { Easy: 0, Medium: 1, Hard: 2 };
 
 export default function QuestionTable({ questionList, showTopic = false, showPattern = true }) {
   const [sortBy, setSortBy] = useState(null);
@@ -14,8 +16,6 @@ export default function QuestionTable({ questionList, showTopic = false, showPat
       setSortDir('asc');
     }
   };
-
-  const difficultyOrder = { Easy: 0, Medium: 1, Hard: 2 };
 
   const sorted = useMemo(() => {
     if (!sortBy) return questionList;

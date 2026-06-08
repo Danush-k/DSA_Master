@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Download, ExternalLink, Pencil, Key, LogOut, Trash2, Flame, Trophy, StickyNote } from 'lucide-react';
 import { auth } from '../firebaseClient.js';
 import { signOut, GoogleAuthProvider, linkWithPopup } from 'firebase/auth';
 import { clearAllLocalStores } from '../services/dbSync.js';
 import useProgressStore from '../store/useProgressStore.js';
-import useRevisionStore from '../store/useRevisionStore.js';
 import useNotesStore from '../store/useNotesStore.js';
 import useAllQuestions from '../hooks/useAllQuestions.js';
 import { renderAvatar, formatLocalDate } from '../utils/helpers.jsx';
@@ -29,11 +28,12 @@ export default function ProfilePage({ user, syncStatus, onLogout }) {
   // Track local username (updates instantly on rename)
   const [localUsername, setLocalUsername] = useState(user?.displayName || profile.name || '');
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocalUsername(user?.displayName || profile.name || '');
   }, [user?.displayName, profile.name]);
 
   // Solved and status metrics
-  const questionStatus = profile.questionStatus || {};
+  const questionStatus = useMemo(() => profile.questionStatus || {}, [profile.questionStatus]);
   const currentStreak = profile.currentStreak || 0;
   const longestStreak = profile.longestStreak || 0;
   
@@ -53,20 +53,16 @@ export default function ProfilePage({ user, syncStatus, onLogout }) {
   const hardPercent = totalHard ? Math.round((solvedHard / totalHard) * 100) : 0;
   const totalPercent = totalProblems ? Math.round((totalSolved / totalProblems) * 100) : 0;
 
-  // Revisions stats
-  const revisions = useRevisionStore((s) => s.profiles[activeProfileId] || {});
-  const totalRevisions = Object.keys(revisions).length;
-
   // Notes stats
   const notes = useNotesStore((s) => s.profiles[activeProfileId] || {});
   const totalNotes = Object.keys(notes).length;
 
   // Recent activity list
-  const solveHistory = profile.solveHistory || [];
+  const solveHistory = useMemo(() => profile.solveHistory || [], [profile.solveHistory]);
   const fallbackHistory = useMemo(() => {
     if (solveHistory.length > 0) return solveHistory;
     return Object.entries(questionStatus)
-      .filter(([_, status]) => status === 'solved')
+      .filter(([, status]) => status === 'solved')
       .map(([id]) => ({ questionId: parseInt(id), solvedAt: null }))
       .slice(0, 10);
   }, [solveHistory, questionStatus]);

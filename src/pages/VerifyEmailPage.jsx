@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Mail, AlertTriangle, Check } from 'lucide-react';
 import { auth } from '../firebaseClient.js';
 import { sendEmailVerification, signOut } from 'firebase/auth';

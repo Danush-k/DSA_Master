@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { User, X, Check, Download, Upload } from 'lucide-react';
@@ -105,7 +105,7 @@ export default function ProfileManagerModal({ onClose }) {
         } else {
           alert('Invalid backup file format.');
         }
-      } catch (err) {
+      } catch {
         alert('Failed to parse backup file.');
       }
     };

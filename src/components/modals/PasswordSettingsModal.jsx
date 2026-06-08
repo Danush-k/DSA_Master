@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Key, X, Check, RefreshCw, AlertTriangle } from 'lucide-react';
 import {

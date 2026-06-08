@@ -1,4 +1,4 @@
-import React from 'react';
+
 
 export default function ProgressRing({ progress, size = 80, strokeWidth = 6, color = 'var(--accent-primary)', children }) {
   const radius = (size - strokeWidth) / 2;

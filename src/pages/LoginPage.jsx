@@ -1,6 +1,5 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useShallow } from 'zustand/react/shallow';
 import { RefreshCw } from 'lucide-react';
 import { auth, db } from '../firebaseClient.js';
 import {
@@ -9,13 +8,14 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   sendPasswordResetEmail,
-  updateProfile
+  updateProfile,
+  sendEmailVerification
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import useProgressStore from '../store/useProgressStore.js';
 import { DsaMasteryLogo } from '../utils/helpers.jsx';
 
-export default function LoginPage({ user }) {
+export default function LoginPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState('signin'); // 'signin', 'signup', 'forgot'
   const [usernameOrEmail, setUsernameOrEmail] = useState('');

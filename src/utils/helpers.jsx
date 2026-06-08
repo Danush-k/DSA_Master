@@ -1,4 +1,5 @@
-import React from 'react';
+/* eslint-disable react-refresh/only-export-components */
+
 import {
   Binary, ArrowUpDown, Type, Hash, ChevronsLeftRight, Columns, Search,
   Link as LinkIcon, Layers, Network, TrendingUp, RotateCcw, Zap, Grid,

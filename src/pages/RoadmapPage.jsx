@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
 import { Map, Search, X, ChevronRight, ChevronDown, ChevronUp, Check } from 'lucide-react';
@@ -242,7 +242,7 @@ export default function RoadmapPage() {
       }
       return true;
     }),
-    [filterLevel, filterTopic, searchQuery, allQuestions, questionStatus]
+    [filterLevel, filterTopic, searchQuery]
   );
 
   const groupedByTopic = useMemo(() => {

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Clock, Calendar, Sparkles, ExternalLink, Check } from 'lucide-react';
 import useProgressStore from '../store/useProgressStore.js';

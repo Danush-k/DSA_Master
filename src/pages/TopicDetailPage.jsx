@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Link, useParams, useLocation } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
 import useProgressStore from '../store/useProgressStore.js';

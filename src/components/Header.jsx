@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
 import {
@@ -7,14 +7,12 @@ import {
 import { renderAvatar } from '../utils/helpers.jsx';
 import useThemeStore from '../store/useThemeStore.js';
 import useProgressStore from '../store/useProgressStore.js';
-import topics from '../data/topics.js';
+
 
 export default function Header({
   title,
   onMenuClick,
-  onManageProfiles,
   syncStatus,
-  user,
   onAuthClick,
   allQuestions = []
 }) {

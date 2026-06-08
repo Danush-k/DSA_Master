@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { User, X, Check } from 'lucide-react';
 import { renderAvatar } from '../../utils/helpers.jsx';

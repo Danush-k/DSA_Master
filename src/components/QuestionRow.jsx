@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, ExternalLink, StickyNote, Star, Trash2 } from 'lucide-react';
+import { Check, ExternalLink, StickyNote, Star } from 'lucide-react';
 import { getProblemVideoUrl, Youtube } from '../utils/helpers.jsx';
 import NotesModal from './modals/NotesModal.jsx';
 import useProgressStore from '../store/useProgressStore.js';
