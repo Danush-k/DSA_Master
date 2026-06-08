@@ -61,7 +61,16 @@ export default function NotesModal({ question, onClose }) {
       const filePath = `user_notes/${currentUser.uid}/${question.id}/${timestamp}_${safeFileName}`;
       const imageRef = ref(storage, filePath);
 
-      await uploadBytes(imageRef, file);
+      // Set a 10-second timeout so the app does not hang indefinitely if Storage is disabled/unconfigured
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Upload timed out. Please check if Firebase Storage is enabled in the Firebase Console and your Storage Rules allow writes.')), 10000)
+      );
+
+      await Promise.race([
+        uploadBytes(imageRef, file),
+        timeoutPromise
+      ]);
+
       const downloadUrl = await getDownloadURL(imageRef);
 
       const markdownLink = `\n![${file.name}](${downloadUrl})\n`;
@@ -71,7 +80,7 @@ export default function NotesModal({ question, onClose }) {
       }));
     } catch (err) {
       console.error('Failed to upload image:', err);
-      setUploadError('Upload failed: ' + err.message);
+      setUploadError(err.message.includes('timed out') ? err.message : 'Upload failed: ' + err.message);
     } finally {
       setUploading(false);
       e.target.value = '';
