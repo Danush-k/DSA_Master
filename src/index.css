@@ -2914,6 +2914,40 @@ input:focus, textarea:focus, select:focus {
   outline-offset: -2px;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   PREMIUM SKELETON LOADERS
+   ═══════════════════════════════════════════════════════════════ */
+
+.skeleton-container {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.skeleton-element {
+  background: var(--border-primary);
+  opacity: 0.15;
+}
+
+.skeleton-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
+  opacity: 0.85;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+.animate-pulse {
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
 
 
 

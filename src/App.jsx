@@ -15,6 +15,7 @@ import useRevisionStore from './store/useRevisionStore.js';
 import useThemeStore from './store/useThemeStore.js';
 import useAllQuestions from './hooks/useAllQuestions.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+import SkeletonLoader from './components/SkeletonLoader.jsx';
 
 // Dynamic imports for pages (Code Splitting)
 const DashboardPage = lazy(() => import('./pages/DashboardPage.jsx'));
@@ -228,11 +229,7 @@ function AppLayout() {
           allQuestions={allQuestions}
         />
         <ErrorBoundary>
-          <Suspense fallback={
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-              <div className="lc-spinner"></div>
-            </div>
-          }>
+          <Suspense fallback={<SkeletonLoader />}>
             <Routes>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/roadmap" element={<RoadmapPage />} />
