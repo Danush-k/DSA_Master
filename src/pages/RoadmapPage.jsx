@@ -1,14 +1,16 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
-import { Map, Search, X, ChevronRight, ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { Map, Search, X, ChevronRight, ChevronDown, ChevronUp, Check, StickyNote, Star } from 'lucide-react';
 import useProgressStore from '../store/useProgressStore.js';
 import useRevisionStore from '../store/useRevisionStore.js';
+import useNotesStore from '../store/useNotesStore.js';
 import useAllQuestions from '../hooks/useAllQuestions.js';
 import topics from '../data/topics.js';
 import patterns from '../data/patterns.js';
 import roadmap from '../data/roadmap.js';
 import { getTopicIcon, getPatternIcon, YoutubeLogo, LeetCodeLogo } from '../utils/helpers.jsx';
+import NotesModal from '../components/modals/NotesModal.jsx';
 
 const LEVEL_CONFIG = {
   Beginner:     { color: '#00b8a3', bg: 'rgba(0,184,163,0.1)',   border: 'rgba(0,184,163,0.25)',   label: 'Easy',   abbr: 'Easy'   },
@@ -33,12 +35,14 @@ const CircleProgress = ({ pct = 0, size = 36, color = '#00b8a3', trackColor = 'r
   );
 };
 
-function ConceptCard({ step, allQuestions, questionStatus }) {
+function ConceptCard({ step, allQuestions, questionStatus, bookmarks, notes }) {
   const [open, setOpen] = useState(false);
+  const [activeNotesQuestion, setActiveNotesQuestion] = useState(null);
   const pattern = patterns[step.patternId];
   const topic   = topics.find(t => t.id === step.topicId);
   const lc = LEVEL_CONFIG[step.level];
   const toggleStatus = useProgressStore((s) => s.toggleStatus);
+  const toggleBookmark = useProgressStore((s) => s.toggleBookmark);
   const scheduleRevision = useRevisionStore((s) => s.scheduleRevision);
   const removeRevision = useRevisionStore((s) => s.removeRevision);
 
@@ -141,6 +145,8 @@ function ConceptCard({ step, allQuestions, questionStatus }) {
             <span style={{ width: 72, textAlign: 'center' }}>Difficulty</span>
             <span style={{ width: 36, textAlign: 'center' }}>Video</span>
             <span style={{ width: 36, textAlign: 'center' }}>LC</span>
+            <span style={{ width: 36, textAlign: 'center' }}>Note</span>
+            <span style={{ width: 36, textAlign: 'center' }}>Save</span>
           </div>
 
           {conceptQs.length === 0 ? (
@@ -151,6 +157,11 @@ function ConceptCard({ step, allQuestions, questionStatus }) {
             conceptQs.map((q, idx) => {
               const isSolved = questionStatus[q.id] === 'solved';
               const diffColor = q.difficulty === 'Easy' ? 'var(--easy)' : q.difficulty === 'Medium' ? 'var(--medium)' : 'var(--hard)';
+              
+              const isBookmarked = Array.isArray(bookmarks) ? bookmarks.includes(q.id) : false;
+              const note = notes[q.id];
+              const hasNote = note && Object.entries(note).some(([k, v]) => v && v !== '' && k !== 'updatedAt');
+
               return (
                 <div
                   key={q.id}
@@ -201,11 +212,49 @@ function ConceptCard({ step, allQuestions, questionStatus }) {
                   >
                     <LeetCodeLogo size={14} />
                   </a>
+
+                  {/* Notes icon */}
+                  <button
+                    onClick={() => setActiveNotesQuestion(q)}
+                    className="lc-prob-icon-btn"
+                    title={hasNote ? "Edit Notes" : "Add Notes"}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: hasNote ? 'var(--accent-primary)' : 'inherit',
+                      opacity: hasNote ? 1 : 0.5
+                    }}
+                  >
+                    <StickyNote size={14} />
+                  </button>
+
+                  {/* Bookmark icon */}
+                  <button
+                    onClick={() => toggleBookmark(q.id)}
+                    className="lc-prob-icon-btn"
+                    title={isBookmarked ? "Remove Bookmark" : "Bookmark Question"}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: isBookmarked ? 'var(--warning)' : 'inherit',
+                      opacity: isBookmarked ? 1 : 0.5
+                    }}
+                  >
+                    <Star size={14} fill={isBookmarked ? "currentColor" : "none"} />
+                  </button>
                 </div>
               );
             })
           )}
         </div>
+      )}
+      {activeNotesQuestion && (
+        <NotesModal 
+          question={activeNotesQuestion} 
+          onClose={() => setActiveNotesQuestion(null)} 
+        />
       )}
     </div>
   );
@@ -214,6 +263,8 @@ function ConceptCard({ step, allQuestions, questionStatus }) {
 export default function RoadmapPage() {
   const activeProfileId = useProgressStore(s => s.activeProfileId);
   const questionStatus  = useProgressStore(useShallow(s => s.profiles[activeProfileId]?.questionStatus || {}));
+  const bookmarks       = useProgressStore(useShallow(s => s.profiles[activeProfileId]?.bookmarks || []));
+  const notes           = useNotesStore(useShallow(s => s.profiles[activeProfileId] || {}));
   const allQuestions    = useAllQuestions();
 
   const [filterLevel, setFilterLevel] = useState('All');
@@ -446,6 +497,8 @@ export default function RoadmapPage() {
                       step={step}
                       allQuestions={allQuestions}
                       questionStatus={questionStatus}
+                      bookmarks={bookmarks}
+                      notes={notes}
                     />
                   ))}
                 </div>

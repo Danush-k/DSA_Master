@@ -104,25 +104,26 @@ export default function QuestionRow({ q, showTopic = false, showPattern = true }
           <span className="question-importance">{q.importance || 'Good to Know'}</span>
         </td>
         <td>
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6
-          }}>
-            <button
-              className={`action-btn tooltip ${noted ? 'active' : ''}`}
-              data-tip={noted ? "Edit Notes" : "Add Notes"}
-              onClick={() => setNotesOpen(true)}
-            >
-              <StickyNote size={14} />
-            </button>
-            <button
-              className={`action-btn tooltip ${bookmarked ? 'active' : ''}`}
-              data-tip={bookmarked ? "Remove Bookmark" : "Bookmark Question"}
-              onClick={() => toggleBookmark(q.id)}
-            >
-              <Star size={14} fill={bookmarked ? "currentColor" : "none"} />
-            </button>
+          <div className="question-actions">
+            <div className="tooltip-wrapper">
+              <button
+                className={`question-action-btn ${noted ? 'active' : ''}`}
+                onClick={() => setNotesOpen(true)}
+                style={noted ? { color: 'var(--accent-primary)' } : {}}
+              >
+                <StickyNote size={14} />
+              </button>
+              <span className="tooltip">{noted ? "Edit Notes" : "Add Notes"}</span>
+            </div>
+            <div className="tooltip-wrapper">
+              <button
+                className={`question-action-btn ${bookmarked ? 'bookmarked' : ''}`}
+                onClick={() => toggleBookmark(q.id)}
+              >
+                <Star size={14} fill={bookmarked ? "currentColor" : "none"} />
+              </button>
+              <span className="tooltip">{bookmarked ? "Remove Bookmark" : "Bookmark Question"}</span>
+            </div>
           </div>
           {notesOpen && <NotesModal question={q} onClose={() => setNotesOpen(false)} />}
         </td>

@@ -5,11 +5,8 @@ import useNotesStore from '../../store/useNotesStore.js';
 
 export default function NotesModal({ question, onClose }) {
   const saveNote = useNotesStore((s) => s.saveNote);
-  const existingNote = useNotesStore((s) => {
-    const profileNotes = s.profiles[s.activeProfileId] || {};
-    return profileNotes[question.id] || {};
-  });
-  const existing = existingNote;
+  const existingNote = useNotesStore((s) => s.profiles[s.activeProfileId]?.[question.id]);
+  const existing = existingNote || {};
   const [form, setForm] = useState({
     keyIdea: existing.keyIdea || '',
     mistakes: existing.mistakes || '',
