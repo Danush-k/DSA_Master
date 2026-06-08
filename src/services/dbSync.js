@@ -252,7 +252,6 @@ async function hydrateFromCloud(user) {
       }
     };
 
-    const currentNotes = useNotesStore.getState();
     const notesStoreState = {
       activeProfileId: 'default',
       profiles: {
@@ -260,7 +259,6 @@ async function hydrateFromCloud(user) {
       }
     };
 
-    const currentRevisions = useRevisionStore.getState();
     const revisionStoreState = {
       activeProfileId: 'default',
       profiles: {
