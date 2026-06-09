@@ -1,4 +1,10 @@
-# DSA Mastery
+# 🚀 DSA Mastery
+
+DSA Mastery is a high-performance, developer-centric React application engineered to help software engineers systematically prepare for technical interviews. The platform integrates pattern-based tracking, automated spaced-repetition scheduling, and real-time cloud synchronization to deliver an optimal preparation workflow.
+
+---
+
+## ⚡ Quick Stats
 
 [![React](https://img.shields.io/badge/React-19.0.0-61DAFB?logo=react&logoColor=white&style=flat-square)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8.0.12-646CFF?logo=vite&logoColor=white&style=flat-square)](https://vitejs.dev/)
@@ -6,7 +12,17 @@
 [![Zustand](https://img.shields.io/badge/Zustand-5.0.14-8A63D2?style=flat-square)](https://github.com/pmndrs/zustand)
 [![Eslint](https://img.shields.io/badge/Linter-ESLint-4B32C3?logo=eslint&logoColor=white&style=flat-square)](https://eslint.org/)
 
-DSA Mastery is a high-performance, developer-centric React application engineered to help software engineers systematically prepare for technical interviews. The platform integrates pattern-based tracking, automated spaced-repetition scheduling, and real-time cloud synchronization to deliver an optimal preparation workflow.
+---
+
+## 📋 Table of Contents
+
+- [🎯 Key Features](#-key-features)
+- [📁 Directory Structure](#-directory-structure)
+- [💻 Tech Stack & Architecture Rationale](#-tech-stack--architecture-rationale)
+- [🛡️ Security Architecture](#️-security-architecture)
+- [🚀 Getting Started](#-getting-started)
+- [🛠️ Project Scripts](#️-project-scripts)
+- [📄 License](#-license)
 
 ---
 
@@ -15,7 +31,7 @@ DSA Mastery is a high-performance, developer-centric React application engineere
 - **Pattern-Based Tracking:** Groups algorithmic problems into foundational mental models (e.g., Two Pointers, Sliding Window, Fast & Slow Pointers, DFS/BFS) rather than arbitrary lists, optimizing conceptual retention.
 - **Automated Spaced-Repetition Scheduler:** Implements structured revision intervals (1, 3, 7, 15, and 30 days) based on cognitive science principles, prompting reviews of solved questions to lock in problem-solving intuition.
 - **GitHub-Style Solve Heatmap:** Provides a visual, calendar-based activity matrix mapping daily solve statistics to cultivate consistency and track streaks.
-- **Rich Interactive Workspace:** Allows developers to document key insights, optimal time/space complexity benchmarks, potential pitfalls, and clean code snippets directly on each problem.
+- **Rich Interactive Workspace (Notes):** Allows developers to document key insights, optimal time/space complexity benchmarks, potential pitfalls, and clean code snippets directly on each problem. 
 - **Custom Question Registry:** Enables users to extend the default problem set by registering custom interview questions tagged with difficulty, algorithmic topics, target companies, and urgency levels.
 - **Real-Time Cloud Sync & Offline Support:** Combines local Zustand store state persistence with background Firebase Firestore sync, enabling seamless transitions between online and offline states.
 
