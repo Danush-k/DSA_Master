@@ -18,7 +18,9 @@ import {
   Code,
   Link,
   Image,
-  Eye
+  Eye,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import useNotesStore from '../../store/useNotesStore.js';
 import { renderMarkdown } from '../../utils/markdown.js';
@@ -40,6 +42,7 @@ export default function NotesModal({ question, onClose }) {
 
   const [activeTab, setActiveTab] = useState('notes'); // Default tab is Additional Notes
   const [isPreview, setIsPreview] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   const textareaRef = useRef(null);
 
   const handleSave = () => {
@@ -202,7 +205,7 @@ export default function NotesModal({ question, onClose }) {
             </div>
 
             {/* Markdown editor area */}
-            <div className="markdown-editor-wrapper">
+            <div className={`markdown-editor-wrapper ${isMaximized ? 'maximized' : ''}`}>
               <div className="markdown-toolbar">
                 <div className="markdown-toolbar-group">
                   <button
@@ -288,6 +291,14 @@ export default function NotesModal({ question, onClose }) {
                     title={isPreview ? "Show Editor" : "Show Preview"}
                   >
                     <Eye size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    className={`markdown-toolbar-btn ${isMaximized ? 'active' : ''}`}
+                    onClick={() => setIsMaximized(!isMaximized)}
+                    title={isMaximized ? "Minimize" : "Maximize"}
+                  >
+                    {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
                   </button>
                 </div>
               </div>
