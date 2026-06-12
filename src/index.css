@@ -3153,33 +3153,57 @@ input:focus, textarea:focus, select:focus {
   margin: 8px 0;
 }
 
-.markdown-editor-wrapper.maximized {
+.modal.maximized {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 1200; /* Higher than modal (1000) */
-  border-radius: 0;
-  height: 100vh !important;
   width: 100vw !important;
+  height: 100vh !important;
   max-width: 100vw !important;
+  max-height: 100vh !important;
+  border-radius: 0;
   margin: 0 !important;
+  display: flex;
+  flex-direction: column;
   background: var(--bg-secondary);
-  animation: fullscreen-entrance 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  z-index: 1000;
+  animation: modal-fullscreen-entrance 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-.markdown-editor-wrapper.maximized .markdown-editor-textarea,
-.markdown-editor-wrapper.maximized .markdown-editor-preview {
-  height: calc(100vh - 44px) !important;
-  max-height: calc(100vh - 44px) !important;
-  resize: none;
+.modal.maximized .modal-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 24px;
 }
 
-@keyframes fullscreen-entrance {
+.modal.maximized .notes-form {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal.maximized .markdown-editor-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: auto;
+}
+
+.modal.maximized .markdown-editor-textarea,
+.modal.maximized .markdown-editor-preview {
+  height: auto !important;
+  max-height: none !important;
+  flex: 1;
+}
+
+@keyframes modal-fullscreen-entrance {
   from {
     opacity: 0;
-    transform: scale(0.96);
+    transform: scale(0.98);
   }
   to {
     opacity: 1;

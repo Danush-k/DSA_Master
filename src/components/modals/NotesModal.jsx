@@ -111,7 +111,7 @@ export default function NotesModal({ question, onClose }) {
 
   return createPortal(
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '720px' }}>
+      <div className={`modal ${isMaximized ? 'maximized' : ''}`} onClick={(e) => e.stopPropagation()} style={isMaximized ? {} : { maxWidth: '720px' }}>
         <div className="modal-header">
           <div>
             <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -205,7 +205,7 @@ export default function NotesModal({ question, onClose }) {
             </div>
 
             {/* Markdown editor area */}
-            <div className={`markdown-editor-wrapper ${isMaximized ? 'maximized' : ''}`}>
+            <div className="markdown-editor-wrapper">
               <div className="markdown-toolbar">
                 <div className="markdown-toolbar-group">
                   <button
