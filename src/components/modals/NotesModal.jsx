@@ -127,81 +127,122 @@ export default function NotesModal({ question, onClose }) {
 
         <div className="modal-body">
           <div className="notes-form">
-            {/* Complexity inputs at the top */}
-            <div className="complexity-row">
-              <div className="notes-field">
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Clock size={14} style={{ color: 'var(--text-secondary)' }} />
-                  Time Complexity
-                </label>
-                <input
-                  type="text"
-                  value={form.timeComplexity}
-                  onChange={(e) => setForm({ ...form, timeComplexity: e.target.value })}
-                  placeholder="e.g. O(n log n)"
-                  style={{
-                    padding: '8px 12px',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border-secondary)',
-                    background: 'var(--bg-input)',
-                    color: 'var(--text-primary)',
-                    outline: 'none',
-                    fontSize: 14,
-                  }}
-                />
+            {/* Note Fields Tabs & Complexity Inline */}
+            <div className="notes-tabs" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-primary)', paddingBottom: '4px', marginBottom: '16px', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 4, overflowX: 'auto' }}>
+                {[
+                  { id: 'notes', label: 'Notes', icon: StickyNote },
+                  { id: 'keyIdea', label: 'Key Idea', icon: Sparkles },
+                  { id: 'optimalApproach', label: 'Optimal Approach', icon: Target },
+                  { id: 'mistakes', label: 'Mistakes', icon: AlertTriangle },
+                  { id: 'interviewLearnings', label: 'Learnings', icon: Info },
+                ].map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      className={`notes-tab-btn ${isActive ? 'active' : ''}`}
+                      onClick={() => {
+                        setActiveTab(tab.id);
+                        setIsPreview(false);
+                      }}
+                      style={{ paddingBottom: '6px' }}
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Icon size={13} />
+                        {tab.label}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
-              <div className="notes-field">
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Layers size={14} style={{ color: 'var(--text-secondary)' }} />
-                  Space Complexity
-                </label>
-                <input
-                  type="text"
-                  value={form.spaceComplexity}
-                  onChange={(e) => setForm({ ...form, spaceComplexity: e.target.value })}
-                  placeholder="e.g. O(n)"
-                  style={{
-                    padding: '8px 12px',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border-secondary)',
-                    background: 'var(--bg-input)',
-                    color: 'var(--text-primary)',
-                    outline: 'none',
-                    fontSize: 14,
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Note Fields Tabs */}
-            <div className="notes-tabs">
-              {[
-                { id: 'notes', label: 'Notes', icon: StickyNote },
-                { id: 'keyIdea', label: 'Key Idea', icon: Sparkles },
-                { id: 'optimalApproach', label: 'Optimal Approach', icon: Target },
-                { id: 'mistakes', label: 'Mistakes', icon: AlertTriangle },
-                { id: 'interviewLearnings', label: 'Learnings', icon: Info },
-              ].map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    className={`notes-tab-btn ${isActive ? 'active' : ''}`}
-                    onClick={() => {
-                      setActiveTab(tab.id);
-                      setIsPreview(false);
+              {/* Inline Complexity Fields */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto', paddingBottom: '4px' }}>
+                {/* Time Capsule */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  background: 'rgba(139, 92, 246, 0.08)',
+                  border: '1px solid rgba(139, 92, 246, 0.3)',
+                  borderRadius: '100px',
+                  padding: '4px 12px',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                  e.currentTarget.style.background = 'rgba(139, 92, 246, 0.12)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+                  e.currentTarget.style.background = 'rgba(139, 92, 246, 0.08)';
+                }}
+                >
+                  <Clock size={12} style={{ color: 'var(--accent-primary)' }} />
+                  <span style={{ fontSize: 11, color: 'var(--accent-primary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Time:</span>
+                  <input
+                    type="text"
+                    value={form.timeComplexity}
+                    onChange={(e) => setForm({ ...form, timeComplexity: e.target.value })}
+                    placeholder="e.g. O(n)"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-primary)',
+                      padding: 0,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      width: '80px',
+                      outline: 'none',
                     }}
-                  >
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Icon size={13} />
-                      {tab.label}
-                    </span>
-                  </button>
-                );
-              })}
+                  />
+                </div>
+
+                {/* Space Capsule */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  background: 'rgba(59, 130, 246, 0.08)',
+                  border: '1px solid rgba(59, 130, 246, 0.3)',
+                  borderRadius: '100px',
+                  padding: '4px 12px',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--accent-secondary)';
+                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.12)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)';
+                }}
+                >
+                  <Layers size={12} style={{ color: 'var(--accent-secondary)' }} />
+                  <span style={{ fontSize: 11, color: 'var(--accent-secondary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em' }}>Space:</span>
+                  <input
+                    type="text"
+                    value={form.spaceComplexity}
+                    onChange={(e) => setForm({ ...form, spaceComplexity: e.target.value })}
+                    placeholder="e.g. O(1)"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-primary)',
+                      padding: 0,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      width: '80px',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Markdown editor area */}
